@@ -28,7 +28,7 @@ pdf2docx==0.5.8
 img2pdf>=0.5,<0.6
 pypdf>=5,<6
 pikepdf>=9,<10
-pdfminer.six>=20231228,<2026.0
+pdfminer.six>=20231228
 ocrmypdf>=16,<18
 pluggy>=1.5,<2
 
