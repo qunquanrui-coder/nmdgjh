@@ -9,6 +9,7 @@ pywebview 版稳定打包脚本（Windows / Python 3.10）
 3. 自动补充 pywin32 DLL
 4. 打包后物理复制 Ghostscript / runtime / poppler_bin
 5. 尽量避免把 Qt / GTK / CEF 等不需要的 pywebview 后端打进来
+6. 修复 GitHub Actions / Windows 控制台中文日志编码报错
 """
 
 from __future__ import annotations
@@ -20,6 +21,26 @@ import subprocess
 import sys
 from pathlib import Path
 from typing import Optional
+
+
+def setup_console_encoding() -> None:
+    """
+    修复 GitHub Actions / Windows 控制台下中文日志输出导致的 charmap 编码报错。
+    """
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+    os.environ["PYTHONUTF8"] = "1"
+
+    try:
+        if hasattr(sys.stdout, "reconfigure"):
+            sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+        if hasattr(sys.stderr, "reconfigure"):
+            sys.stderr.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+if sys.platform == "win32":
+    setup_console_encoding()
 
 
 ROOT = Path(__file__).resolve().parent
@@ -40,12 +61,12 @@ RUNTIME_DIRS = [
 ]
 
 
-if sys.platform == "win32":
-    os.environ["PYTHONIOENCODING"] = "utf-8"
-
-
 def log(msg: str) -> None:
-    print(msg, flush=True)
+    try:
+        print(msg, flush=True)
+    except UnicodeEncodeError:
+        safe_msg = msg.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+        print(safe_msg, flush=True)
 
 
 def remove_dir(path: Path) -> None:

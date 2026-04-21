@@ -17,6 +17,9 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
 
     steps:
       - name: Checkout code
@@ -31,17 +34,26 @@ jobs:
 
       - name: Install dependencies
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
         run: |
           python -m pip install --upgrade pip setuptools wheel
-          pip install -r requirements.txt
+          python -m pip install -r requirements.txt
 
       - name: Build package
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
         run: |
           python build_modern.py
 
       - name: Verify build output
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
         run: |
           Write-Host "=== dist/main contents ==="
           Get-ChildItem -Recurse dist\main\
@@ -64,6 +76,9 @@ jobs:
 
       - name: Create zip package
         shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
         run: |
           $refName = "${{ github.ref_name }}"
           if (-not "${{ github.ref }}".StartsWith("refs/tags/")) {
