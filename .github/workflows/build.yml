@@ -29,13 +29,23 @@ jobs:
       
       - name: Verify build output
         run: |
+          Write-Host "=== dist/main contents ==="
+          Get-ChildItem -Recurse dist\main\
           if (Test-Path "dist\main\main.exe") {
-            Write-Host "Build output found!"
-            Get-ChildItem dist\main\
+            Write-Host "`n[OK] main.exe found!"
           } else {
-            Write-Error "Build output NOT found at dist\main\main.exe"
+            Write-Error "[FAIL] main.exe NOT found"
             exit 1
           }
+        shell: pwsh
+      
+      - name: Compress release package
+        run: |
+          $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
+          Compress-Archive -Path dist\main\* -DestinationPath Baibaoxiang_$tag.zip -Force
+          Write-Host "Package created: Baibaoxiang_$tag.zip"
+          Get-ChildItem *.zip
+          echo "PACKAGE_NAME=Baibaoxiang_$tag.zip" >> $env:GITHUB_OUTPUT
         shell: pwsh
       
       - name: Create Release Tag
@@ -52,5 +62,5 @@ jobs:
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: dist/main/main.exe
+          files: Baibaoxiang_${{ steps.tag_version.outputs.tag }}.zip
           tag_name: ${{ steps.tag_version.outputs.tag }}
