@@ -22,7 +22,6 @@ jobs:
           python-version: '3.10'
       
       - name: Install build dependencies and Build
-        working-directory: Baibaoxiang_Web
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
@@ -30,11 +29,11 @@ jobs:
       
       - name: Verify build output
         run: |
-          if (Test-Path "Baibaoxiang_Web\dist\main\main.exe") {
+          if (Test-Path "dist\main\main.exe") {
             Write-Host "Build output found!"
-            Get-ChildItem Baibaoxiang_Web\dist\main\
+            Get-ChildItem dist\main\
           } else {
-            Write-Error "Build output NOT found at Baibaoxiang_Web\dist\main\main.exe"
+            Write-Error "Build output NOT found at dist\main\main.exe"
             exit 1
           }
         shell: pwsh
@@ -53,5 +52,5 @@ jobs:
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: Baibaoxiang_Web/dist/main/main.exe
+          files: dist/main/main.exe
           tag_name: ${{ steps.tag_version.outputs.tag }}
