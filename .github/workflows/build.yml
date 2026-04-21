@@ -22,19 +22,20 @@ jobs:
           python-version: '3.10'
       
       - name: Install build dependencies
+        working-directory: ./Baibaoxiang_Web
         run: |
           pip install --upgrade pip
-          pip install eel PyInstaller pywin32 fitz pandas openpyxl pdfplumber docx PIL pythoncom pywintypes pdf2docx img2pdf pypdf rapidocr_onnxruntime bottle_websocket bottle websocket comtypes win32api win32gui win32con ocrmypdf pikepdf pdfminer pluggy cv2 numpy
+          pip install -r requirements.txt
         shell: pwsh
       
-      - name: Build with build_modern.py
+      - name: Build with PyInstaller
         working-directory: ./Baibaoxiang_Web
-        run: python build_modern.py
+        run: |
+          python build_modern.py
         shell: pwsh
       
-      - name: Create Release Tag and Upload Asset
-        id: create_release
-        uses: softprops/action-gh-release@v2
+      - name: Upload artifact
+        uses: actions/upload-artifact@v4
         with:
-          files: ./Baibaoxiang_Web/dist/main/Baibaoxiang.exe
-          tag_name: v${{ github.run_number }}
+          name: Baibaoxiang
+          path: ./Baibaoxiang_Web/dist/main/Baibaoxiang.exe
