@@ -1,0 +1,44 @@
+# 运行时二进制依赖（包含大量 DLL / 可执行文件）
+Ghostscript/bin/
+poppler_bin/
+runtime/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Eel / Web 构建产物
+*.app
+*.appx
+
+# 崩溃日志
+crash_log.txt
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
