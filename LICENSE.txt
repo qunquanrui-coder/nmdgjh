@@ -1,4 +1,11 @@
 
+---
+
+## 8-B）新增 `LICENSE.txt`
+
+
+
+```txt
 Baibaoxiang Web
 Copyright (c) 2026
 All rights reserved.

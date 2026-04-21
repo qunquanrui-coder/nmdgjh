@@ -4,23 +4,30 @@
     <meta charset="UTF-8">
     <title>泉泉大人的工具合集</title>
     <link rel="stylesheet" href="style.css">
-    <script type="text/javascript" src="/eel.js"></script>
-    <div class="toast-container" id="toast-container"></div>
 </head>
 <body>
+    <div class="toast-container" id="toast-container"></div>
+
     <div class="app-container">
         <aside class="sidebar">
-            <div class="logo-area"><h2>🚀 泉泉大人的工具合集</h2><div class="sys-status"><span class="dot"></span> SYSTEM ONLINE | ROOT</div></div>
+            <div class="logo-area">
+                <h2>🚀 泉泉大人的工具合集</h2>
+                <div class="sys-status"><span class="dot"></span> SYSTEM ONLINE | ROOT</div>
+            </div>
+
             <nav class="nav-menu">
                 <a href="#" class="nav-item active" onclick="switchView('dashboard', this)">📊 运行概览</a>
+
                 <div class="nav-group">文档处理</div>
                 <a href="#" class="nav-item" onclick="switchView('p2w', this)">📝 PDF 提取 Word</a>
                 <a href="#" class="nav-item" onclick="switchView('rmblank', this)">🧹 Word 空白页清理</a>
-                <a href="#" class="nav-item" onclick="switchView('pdfclean', this)">🔳 扫描件去黑边</a>  <a href="#" class="nav-item" onclick="switchView('split', this)">✂️ PDF 精准拆分</a>
+                <a href="#" class="nav-item" onclick="switchView('pdfclean', this)">🔳 扫描件去黑边</a>
+                <a href="#" class="nav-item" onclick="switchView('split', this)">✂️ PDF 精准拆分</a>
                 <a href="#" class="nav-item" onclick="switchView('wsplit', this)">🔪 Word 目录拆解</a>
                 <a href="#" class="nav-item" onclick="switchView('wmerge', this)">🔗 Word 批量合并</a>
                 <a href="#" class="nav-item" onclick="switchView('unlock', this)">🔓 PDF 权限解密</a>
                 <a href="#" class="nav-item" onclick="switchView('comp', this)">🧹 文档极限瘦身</a>
+
                 <div class="nav-group">转换与 OCR</div>
                 <a href="#" class="nav-item" onclick="switchView('ocr', this)">📄 PDF OCR 增强</a>
                 <a href="#" class="nav-item" onclick="switchView('i2p', this)">🖼️ 图像转编 PDF</a>
@@ -32,10 +39,16 @@
         </aside>
 
         <main class="main-content">
-            <header><h1 id="page-title">运行概览</h1><p class="subtitle" id="page-subtitle">系统状态与近期活动</p></header>
+            <header>
+                <h1 id="page-title">运行概览</h1>
+                <p class="subtitle" id="page-subtitle">系统状态与近期活动</p>
+            </header>
 
             <div id="view-dashboard" class="tool-view active">
-                <div class="glass-card"><h3>系统已就绪</h3><p>V1.5 极客内核已加载。面板动画、交互反馈模块上线。点击左侧功能开始使用。</p></div>
+                <div class="glass-card">
+                    <h3>系统已就绪</h3>
+                    <p>V1.5 极客内核已加载。面板动画、交互反馈模块上线。点击左侧功能开始使用。</p>
+                </div>
             </div>
 
             <div id="view-pdfclean" class="tool-view">
@@ -76,47 +89,96 @@
 
             <div id="view-p2w" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>PDF 路径:</label><input type="text" id="p2w-path" readonly><button class="btn-secondary" onclick="selectFile('p2w-path')">选择</button></div>
-                    <div class="input-group"><label>模式:</label><select id="p2w-mode"><option value="editable">📝 可编辑</option><option value="image">🖼️ 纯图模式</option></select>
-                    <label style="width:auto;margin-left:15px">DPI:</label><input type="number" id="p2w-dpi" value="150" style="width:60px"></div>
+                    <div class="input-group">
+                        <label>PDF 路径:</label>
+                        <input type="text" id="p2w-path" readonly>
+                        <button class="btn-secondary" onclick="selectFile('p2w-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>模式:</label>
+                        <select id="p2w-mode">
+                            <option value="editable">📝 可编辑</option>
+                            <option value="image">🖼️ 纯图模式</option>
+                        </select>
+                        <label style="width:auto;margin-left:15px">DPI:</label>
+                        <input type="number" id="p2w-dpi" value="150" style="width:60px">
+                    </div>
                     <button class="btn-primary" onclick="execTask('p2w', this)">🚀 开始转换</button>
                 </div>
             </div>
 
             <div id="view-split" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>PDF 文件:</label><input type="text" id="split-path" readonly><button class="btn-secondary" onclick="selectFile('split-path')">选择</button></div>
-                    <div class="input-group"><label>数值:</label><input type="number" id="split-val" value="10" style="width:80px">
-                    <select id="split-mode"><option value="split_fixed">📏 定长</option><option value="split_avg">⚖️ 平均</option></select></div>
+                    <div class="input-group">
+                        <label>PDF 文件:</label>
+                        <input type="text" id="split-path" readonly>
+                        <button class="btn-secondary" onclick="selectFile('split-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>数值:</label>
+                        <input type="number" id="split-val" value="10" style="width:80px">
+                        <select id="split-mode">
+                            <option value="split_fixed">📏 定长</option>
+                            <option value="split_avg">⚖️ 平均</option>
+                        </select>
+                    </div>
                     <button class="btn-primary" onclick="execTask('split', this)">🚀 执行拆分</button>
                 </div>
             </div>
 
             <div id="view-wsplit" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>Word 文件:</label><input type="text" id="wsplit-path" readonly><button class="btn-secondary" onclick="selectWordFileForSplit('wsplit-path')">分析大纲</button></div>
+                    <div class="input-group">
+                        <label>Word 文件:</label>
+                        <input type="text" id="wsplit-path" readonly>
+                        <button class="btn-secondary" onclick="selectWordFileForSplit('wsplit-path')">分析大纲</button>
+                    </div>
                     <input type="hidden" id="wsplit-out">
-                    <div class="input-group"><label>提取级别:</label><select id="wsplit-level"></select><span id="wsplit-status" style="font-size:0.8rem;margin-left:10px">就绪</span></div>
+                    <div class="input-group">
+                        <label>提取级别:</label>
+                        <select id="wsplit-level"></select>
+                        <span id="wsplit-status" style="font-size:0.8rem;margin-left:10px">就绪</span>
+                    </div>
                     <button class="btn-primary" onclick="execTask('wsplit', this)">🚀 开始无损拆解</button>
                 </div>
             </div>
 
             <div id="view-wmerge" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>标书文件夹:</label><input type="text" id="wmerge-dir" readonly><button class="btn-secondary" onclick="selectFolder('wmerge-dir')">选择目录</button></div>
-                    <div class="input-group"><label>输出名称:</label><input type="text" id="wmerge-name" value="合并版.docx"></div>
+                    <div class="input-group">
+                        <label>标书文件夹:</label>
+                        <input type="text" id="wmerge-dir" readonly>
+                        <button class="btn-secondary" onclick="selectFolder('wmerge-dir')">选择目录</button>
+                    </div>
+                    <div class="input-group">
+                        <label>输出名称:</label>
+                        <input type="text" id="wmerge-name" value="合并版.docx">
+                    </div>
                     <button class="btn-primary" onclick="execTask('wmerge', this)">🚀 强力合并</button>
                 </div>
             </div>
 
             <div id="view-unlock" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>PDF 源:</label><input type="text" id="unlock-path" readonly><button class="btn-secondary" onclick="selectFile('unlock-path')">选择</button></div>
-                    <div class="input-group"><label>打开密码:</label><input type="password" id="unlock-pwd" placeholder="(若无打开密码则留空)"></div>
+                    <div class="input-group">
+                        <label>PDF 源:</label>
+                        <input type="text" id="unlock-path" readonly>
+                        <button class="btn-secondary" onclick="selectFile('unlock-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>打开密码:</label>
+                        <input type="password" id="unlock-pwd" placeholder="(若无打开密码则留空)">
+                    </div>
                     <div class="input-group" style="margin-bottom: 20px;">
-                        <input type="checkbox" id="unlock-empty" checked><label for="unlock-empty" style="width:auto; margin-left:5px; margin-right:15px">尝试清洗无密码限制</label>
-                        <input type="checkbox" id="unlock-suffix" checked><label for="unlock-suffix" style="width:auto; margin-left:5px; margin-right:15px">保留原文件</label>
-                        <input type="checkbox" id="unlock-retry" checked><label for="unlock-retry" style="width:auto; margin-left:5px; margin-right:15px">快速失败自动安全重试</label>
+                        <input type="checkbox" id="unlock-empty" checked>
+                        <label for="unlock-empty" style="width:auto; margin-left:5px; margin-right:15px">尝试清洗无密码限制</label>
+
+                        <input type="checkbox" id="unlock-suffix" checked>
+                        <label for="unlock-suffix" style="width:auto; margin-left:5px; margin-right:15px">保留原文件</label>
+
+                        <input type="checkbox" id="unlock-retry" checked>
+                        <label for="unlock-retry" style="width:auto; margin-left:5px; margin-right:15px">快速失败自动安全重试</label>
+
                         <label style="width:auto; margin-right:5px">模式:</label>
                         <select id="unlock-mode">
                             <option value="0">安全(防报错推荐)</option>
@@ -129,62 +191,85 @@
 
             <div id="view-comp" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>PDF 文件:</label><input type="text" id="comp-path" readonly><button class="btn-secondary" onclick="selectFile('comp-path')">选择</button></div>
-                    <div class="input-group"><label>目标大小:</label><input type="number" id="comp-size" value="180" style="width:80px">
-                    <select id="comp-unit"><option value="MB">MB</option><option value="KB">KB</option></select></div>
+                    <div class="input-group">
+                        <label>PDF 文件:</label>
+                        <input type="text" id="comp-path" readonly>
+                        <button class="btn-secondary" onclick="selectFile('comp-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>目标大小:</label>
+                        <input type="number" id="comp-size" value="180" style="width:80px">
+                        <select id="comp-unit">
+                            <option value="MB">MB</option>
+                            <option value="KB">KB</option>
+                        </select>
+                    </div>
                     <button class="btn-primary" onclick="execTask('comp', this)">🚀 自动调参压缩</button>
                 </div>
             </div>
 
             <div id="view-i2p" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>图片文件夹:</label><input type="text" id="i2p-path" readonly><button class="btn-secondary" onclick="selectFolder('i2p-path')">选择</button></div>
+                    <div class="input-group">
+                        <label>图片文件夹:</label>
+                        <input type="text" id="i2p-path" readonly>
+                        <button class="btn-secondary" onclick="selectFolder('i2p-path')">选择</button>
+                    </div>
                     <button class="btn-primary" onclick="execTask('i2p', this)">🚀 自然排序合并 PDF</button>
                 </div>
             </div>
 
             <div id="view-w2p" class="tool-view">
-  <div class="glass-card">
-    <div class="input-group">
-      <label>输入来源:</label>
-      <input
-        type="text"
-        id="w2p-path"
-        readonly
-        placeholder="支持单个 Office 文件或整个文件夹"
-      >
-      <button class="btn-secondary" onclick="selectFile('w2p-path')">选文件</button>
-      <button class="btn-secondary" onclick="selectFolder('w2p-path')" style="margin-left:5px">选文件夹</button>
-    </div>
+                <div class="glass-card">
+                    <div class="input-group">
+                        <label>输入来源:</label>
+                        <input type="text" id="w2p-path" readonly placeholder="支持单个 Office 文件或整个文件夹">
+                        <button class="btn-secondary" onclick="selectFile('w2p-path')">选文件</button>
+                        <button class="btn-secondary" onclick="selectFolder('w2p-path')" style="margin-left:5px">选文件夹</button>
+                    </div>
 
-    <div class="input-group">
-      <input type="checkbox" id="w2p-doc">
-      <label for="w2p-doc" style="width:auto; margin-left:5px">包含.doc</label>
+                    <div class="input-group">
+                        <input type="checkbox" id="w2p-doc">
+                        <label for="w2p-doc" style="width:auto; margin-left:5px">包含.doc</label>
 
-      <input type="checkbox" id="w2p-xls" checked style="margin-left:15px">
-      <label for="w2p-xls" style="width:auto; margin-left:5px">包含Excel</label>
+                        <input type="checkbox" id="w2p-xls" checked style="margin-left:15px">
+                        <label for="w2p-xls" style="width:auto; margin-left:5px">包含Excel</label>
 
-      <input type="checkbox" id="w2p-pdfa" style="margin-left:15px">
-      <label for="w2p-pdfa" style="width:auto; margin-left:5px">PDF/A 标准</label>
-    </div>
+                        <input type="checkbox" id="w2p-pdfa" style="margin-left:15px">
+                        <label for="w2p-pdfa" style="width:auto; margin-left:5px">PDF/A 标准</label>
+                    </div>
 
-    <button class="btn-primary" onclick="execTask('w2p', this)"> Office 原生导出</button>
-  </div>
-</div>
+                    <button class="btn-primary" onclick="execTask('w2p', this)">Office 原生导出</button>
+                </div>
+            </div>
+
             <div id="view-p2i" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>PDF 路径:</label><input type="text" id="p2i-path" readonly><button class="btn-secondary" onclick="selectFile('p2i-path')">选择</button></div>
-                    <div class="input-group"><label>长边像素:</label><input type="number" id="p2i-edge" value="2048" style="width:100px">
-                    <label style="width:auto;margin-left:15px">质量:</label><input type="number" id="p2i-q" value="90" style="width:60px"></div>
+                    <div class="input-group">
+                        <label>PDF 路径:</label>
+                        <input type="text" id="p2i-path" readonly>
+                        <button class="btn-secondary" onclick="selectFile('p2i-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>长边像素:</label>
+                        <input type="number" id="p2i-edge" value="2048" style="width:100px">
+                        <label style="width:auto;margin-left:15px">质量:</label>
+                        <input type="number" id="p2i-q" value="90" style="width:60px">
+                    </div>
                     <button class="btn-primary" onclick="execTask('p2i', this)">🚀 Acrobat 对齐渲染</button>
                 </div>
             </div>
 
             <div id="view-inv" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>发票目录:</label><input type="text" id="inv-path" readonly><button class="btn-secondary" onclick="selectFolder('inv-path')">选择</button></div>
                     <div class="input-group">
-                        <input type="checkbox" id="inv-rec" checked><label for="inv-rec" style="width:auto; margin-left:5px">递归扫描子文件夹</label>
+                        <label>发票目录:</label>
+                        <input type="text" id="inv-path" readonly>
+                        <button class="btn-secondary" onclick="selectFolder('inv-path')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <input type="checkbox" id="inv-rec" checked>
+                        <label for="inv-rec" style="width:auto; margin-left:5px">递归扫描子文件夹</label>
                     </div>
                     <button class="btn-primary" onclick="execTask('inv', this)">🚀 OCR 结构化提取</button>
                 </div>
@@ -192,10 +277,19 @@
 
             <div id="view-diff" class="tool-view">
                 <div class="glass-card">
-                    <div class="input-group"><label>原文件:</label><input type="text" id="diff-f1" readonly><button class="btn-secondary" onclick="selectFile('diff-f1')">选择</button></div>
-                    <div class="input-group"><label>修改后:</label><input type="text" id="diff-f2" readonly><button class="btn-secondary" onclick="selectFile('diff-f2')">选择</button></div>
                     <div class="input-group">
-                        <input type="checkbox" id="diff-strict" checked><label for="diff-strict" style="width:auto; margin-left:5px">严格模式 (遇到异常中断而非跳过)</label>
+                        <label>原文件:</label>
+                        <input type="text" id="diff-f1" readonly>
+                        <button class="btn-secondary" onclick="selectFile('diff-f1')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <label>修改后:</label>
+                        <input type="text" id="diff-f2" readonly>
+                        <button class="btn-secondary" onclick="selectFile('diff-f2')">选择</button>
+                    </div>
+                    <div class="input-group">
+                        <input type="checkbox" id="diff-strict" checked>
+                        <label for="diff-strict" style="width:auto; margin-left:5px">严格模式 (遇到异常中断而非跳过)</label>
                     </div>
                     <button class="btn-primary" onclick="execTask('diff', this)">🚀 生成对比报告</button>
                 </div>
@@ -203,10 +297,13 @@
 
             <div class="terminal-container">
                 <div class="terminal-header">>_ ROOT_TERMINAL //</div>
-                <div class="terminal-body" id="terminal"><div>[✓] System Kernel V1.5 Initialized.</div></div>
+                <div class="terminal-body" id="terminal">
+                    <div>[✓] System Kernel V1.5 Initialized.</div>
+                </div>
             </div>
         </main>
     </div>
-    <script src="script.js?v=4"></script>
+
+    <script src="script.js?v=5"></script>
 </body>
 </html>

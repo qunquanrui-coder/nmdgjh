@@ -1,14 +1,14 @@
 # -*- coding: utf-8 -*-
 """
 build_modern.py
-稳定版 PyInstaller 打包脚本（Windows / Python 3.10）
+pywebview 版稳定打包脚本（Windows / Python 3.10）
 
 目标：
 1. 固定输出 dist/main/main.exe
 2. 物理复制 web 前端资源到 dist/main/web
 3. 自动补充 pywin32 DLL
 4. 打包后物理复制 Ghostscript / runtime / poppler_bin
-5. 提前校验关键文件，减少“打包成功但运行失败”
+5. 尽量避免把 Qt / GTK / CEF 等不需要的 pywebview 后端打进来
 """
 
 from __future__ import annotations
@@ -41,15 +41,7 @@ RUNTIME_DIRS = [
 
 
 if sys.platform == "win32":
-    os.environ["PYTHONUTF8"] = "1"
     os.environ["PYTHONIOENCODING"] = "utf-8"
-    import ctypes
-    try:
-        # Set console code page to UTF-8 (65001)
-        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
-        ctypes.windll.kernel32.SetConsoleCP(65001)
-    except Exception:
-        pass
 
 
 def log(msg: str) -> None:
@@ -119,14 +111,33 @@ def build_pyinstaller_command() -> list[str]:
         str(BUILD_DIR),
         "--specpath",
         str(SPEC_DIR),
-        "--hidden-import=eel",
-        "--hidden-import=bottle",
-        "--hidden-import=bottle_websocket",
-        "--hidden-import=bottle.ext.websocket",
-        "--hidden-import=websocket",
-        "--hidden-import=websocket._core",
-        "--hidden-import=tkinter",
-        "--hidden-import=tkinter.filedialog",
+
+        # pywebview
+        "--hidden-import=webview",
+        "--hidden-import=webview.platforms.winforms",
+        "--hidden-import=webview.platforms.edgechromium",
+        "--hidden-import=webview.platforms.mshtml",
+        "--collect-submodules=webview",
+        "--collect-data=webview",
+
+        # 精简 pywebview 不需要的平台后端
+        "--exclude-module=PyQt5",
+        "--exclude-module=PyQt6",
+        "--exclude-module=PySide2",
+        "--exclude-module=PySide6",
+        "--exclude-module=qtpy",
+        "--exclude-module=gi",
+        "--exclude-module=cefpython3",
+        "--exclude-module=webview.platforms.qt",
+        "--exclude-module=webview.platforms.gtk",
+        "--exclude-module=webview.platforms.cef",
+        "--exclude-module=webview.platforms.cocoa",
+
+        # 老 Eel websocket 依赖已不再需要
+        "--exclude-module=bottle_websocket",
+        "--exclude-module=websocket",
+
+        # Windows / COM
         "--hidden-import=pythoncom",
         "--hidden-import=pywintypes",
         "--hidden-import=win32timezone",
@@ -135,6 +146,8 @@ def build_pyinstaller_command() -> list[str]:
         "--hidden-import=win32gui",
         "--hidden-import=win32com.client",
         "--hidden-import=comtypes",
+
+        # 文档 / 图像 / OCR
         "--hidden-import=fitz",
         "--hidden-import=pandas",
         "--hidden-import=openpyxl",
@@ -151,12 +164,29 @@ def build_pyinstaller_command() -> list[str]:
         "--hidden-import=pikepdf",
         "--hidden-import=pdfminer",
         "--hidden-import=pluggy",
-        "--collect-submodules=win32com",
+
         "--collect-submodules=pdf2docx",
         "--collect-submodules=pdfminer",
         "--collect-all=ocrmypdf",
         "--copy-metadata=ocrmypdf",
         "--copy-metadata=pikepdf",
+
+        # 核心模块
+        "--hidden-import=app_api",
+        "--hidden-import=core_blank_page",
+        "--hidden-import=core_compress",
+        "--hidden-import=core_diff",
+        "--hidden-import=core_img2pdf",
+        "--hidden-import=core_invoice",
+        "--hidden-import=core_ocr",
+        "--hidden-import=core_pdf2img",
+        "--hidden-import=core_pdf2word",
+        "--hidden-import=core_pdf_cleaner",
+        "--hidden-import=core_split",
+        "--hidden-import=core_unlock",
+        "--hidden-import=core_word2pdf",
+        "--hidden-import=core_word_merge",
+        "--hidden-import=core_word_split",
     ]
 
     pywin32_dll_dir = find_pywin32_system32()

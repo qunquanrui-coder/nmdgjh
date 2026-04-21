@@ -32,16 +32,12 @@ jobs:
       - name: Install dependencies
         shell: pwsh
         run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          $env:PYTHONIOENCODING = "utf-8"
           python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
 
       - name: Build package
         shell: pwsh
         run: |
-          [Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-          $env:PYTHONIOENCODING = "utf-8"
           python build_modern.py
 
       - name: Verify build output
