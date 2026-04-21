@@ -22,20 +22,18 @@ jobs:
           python-version: '3.10'
       
       - name: Install build dependencies
-        working-directory: ./Baibaoxiang_Web
         run: |
           pip install --upgrade pip
           pip install -r requirements.txt
-        shell: pwsh
+        working-directory: Baibaoxiang_Web
       
       - name: Build with PyInstaller
-        working-directory: ./Baibaoxiang_Web
         run: |
           python build_modern.py
-        shell: pwsh
+        working-directory: Baibaoxiang_Web
       
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: Baibaoxiang
-          path: ./Baibaoxiang_Web/dist/main/Baibaoxiang.exe
+          path: Baibaoxiang_Web/dist/main/Baibaoxiang.exe
