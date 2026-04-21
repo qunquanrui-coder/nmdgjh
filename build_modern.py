@@ -41,7 +41,15 @@ RUNTIME_DIRS = [
 
 
 if sys.platform == "win32":
+    os.environ["PYTHONUTF8"] = "1"
     os.environ["PYTHONIOENCODING"] = "utf-8"
+    import ctypes
+    try:
+        # Set console code page to UTF-8 (65001)
+        ctypes.windll.kernel32.SetConsoleOutputCP(65001)
+        ctypes.windll.kernel32.SetConsoleCP(65001)
+    except Exception:
+        pass
 
 
 def log(msg: str) -> None:
