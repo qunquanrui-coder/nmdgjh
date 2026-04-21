@@ -29,8 +29,19 @@ jobs:
           python build_modern.py
         shell: cmd
       
-      - name: Upload artifact
-        uses: actions/upload-artifact@v4
+      - name: Create Release Tag
+        id: tag_version
+        run: |
+          $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
+          echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag $tag
+          git push origin $tag
+        shell: pwsh
+      
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v2
         with:
-          name: Baibaoxiang
-          path: Baibaoxiang_Web/dist/main/Baibaoxiang.exe
+          files: Baibaoxiang_Web/dist/main/Baibaoxiang.exe
+          tag_name: ${{ steps.tag_version.outputs.tag }}
