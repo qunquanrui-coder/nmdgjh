@@ -1,8 +1,3 @@
-# 运行时二进制依赖（包含大量 DLL / 可执行文件）
-Ghostscript/bin/
-poppler_bin/
-runtime/
-
 # Python
 __pycache__/
 *.py[cod]
