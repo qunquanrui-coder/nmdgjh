@@ -29,6 +29,10 @@ jobs:
           python build_modern.py
         shell: cmd
       
+      - name: List dist contents for debugging
+        run: dir /s Baibaoxiang_Web\dist
+        shell: pwsh
+      
       - name: Create Release Tag
         id: tag_version
         run: |
@@ -43,5 +47,5 @@ jobs:
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: Baibaoxiang_Web/dist/main/Baibaoxiang.exe
+          files: Baibaoxiang_Web/dist/main/main.exe
           tag_name: ${{ steps.tag_version.outputs.tag }}
