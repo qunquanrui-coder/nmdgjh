@@ -1,0 +1,70 @@
+name: Build & Release
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          pip install --upgrade pip
+          pip install eel PyInstaller pywin32
+      
+      - name: Build with PyInstaller
+        working-directory: ./Baibaoxiang_Web
+        run: |
+          python -m PyInstaller ^
+            --name "Baibaoxiang" ^
+            --windowed ^
+            --onefile ^
+            --add-data "web;web" ^
+            --add-data "toolbox_icon_clean.ico;." ^
+            --hidden-import=eel ^
+            --hidden-import=core_blank_page ^
+            --hidden-import=core_pdf2word ^
+            --hidden-import=core_split ^
+            --hidden-import=core_word_split ^
+            --hidden-import=core_word_merge ^
+            --hidden-import=core_unlock ^
+            --hidden-import=core_compress ^
+            --hidden-import=core_img2pdf ^
+            --hidden-import=core_word2pdf ^
+            --hidden-import=core_pdf2img ^
+            --hidden-import=core_invoice ^
+            --hidden-import=core_diff ^
+            --hidden-import=core_ocr ^
+            --hidden-import=core_pdf_cleaner ^
+            main.py
+      
+      - name: Create Release Tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
+          echo "TAG=$tag" >> $env:GITHUB_ENV
+          git tag $tag
+          git push origin $tag
+        shell: pwsh
+      
+      - name: Upload Release Asset
+        uses: softprops/action-gh-release@v1
+        with:
+          files: ./Baibaoxiang_Web/dist/Baibaoxiang.exe
+          tag_name: ${{ env.TAG }}
