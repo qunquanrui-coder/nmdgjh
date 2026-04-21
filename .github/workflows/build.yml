@@ -28,6 +28,17 @@ jobs:
           pip install -r requirements.txt
           python build_modern.py
       
+      - name: Verify build output
+        run: |
+          if (Test-Path "Baibaoxiang_Web\dist\main\main.exe") {
+            Write-Host "Build output found!"
+            Get-ChildItem Baibaoxiang_Web\dist\main\
+          } else {
+            Write-Error "Build output NOT found at Baibaoxiang_Web\dist\main\main.exe"
+            exit 1
+          }
+        shell: pwsh
+      
       - name: Create Release Tag
         id: tag_version
         run: |
