@@ -1,162 +1,238 @@
 # -*- coding: utf-8 -*-
 """
-build_modern.py - Web architecture full hardening version (Eel ultimate packaging)
-Core changes:
-1. Entry point switched to main.py
-2. Auto-inject web frontend folder (HTML/CSS/JS)
-3. Force inject Eel底层 WebSocket dependencies, prevent disconnection
-4. Supplement pdf2docx, img2pdf, rapidocr_onnxruntime, pypdf hidden imports
+build_modern.py
+稳定版 PyInstaller 打包脚本（Windows / Python 3.10）
+
+目标：
+1. 固定输出 dist/main/main.exe
+2. 物理复制 web 前端资源到 dist/main/web
+3. 自动补充 pywin32 DLL
+4. 打包后物理复制 Ghostscript / runtime / poppler_bin
+5. 提前校验关键文件，减少“打包成功但运行失败”
 """
-import sys
+
+from __future__ import annotations
+
 import os
 import shutil
+import site
 import subprocess
+import sys
 from pathlib import Path
-from typing import Optional, List
-
-# Fix Windows console UTF-8 encoding issue
-if sys.platform == 'win32':
-    os.environ['PYTHONIOENCODING'] = 'utf-8'
-
-class DependencyChecker:
-    @staticmethod
-    def find_pywin32_dll() -> Optional[Path]:
-        """Fix pywin32_system32.__file__ being None issue"""
-        try:
-            import pywin32_system32
-            f = getattr(pywin32_system32, "__file__", None)
-            if f:
-                return Path(f).parent
-        except (ImportError, TypeError):
-            pass
-        
-        py_site = Path(sys.executable).parent / "Lib" / "site-packages" / "pywin32_system32"
-        return py_site if py_site.exists() else None
+from typing import Optional
 
 
-def build() -> None:
-    entry: Path = Path("main.py")
-    if not entry.exists():
-        print("[ERROR] Cannot find main.py")
-        return
+ROOT = Path(__file__).resolve().parent
+ENTRY = ROOT / "main.py"
+APP_NAME = "main"
 
-    # Clean old builds
-    for d in ["build", "dist", "__pycache__"]:
-        target: Path = Path(d)
-        if target.exists(): 
-            try:
-                shutil.rmtree(target)
-                print(f"[CLEAN] Removed {d} directory")
-            except OSError as e:
-                print(f"[WARN] Failed to clean {d}: {e}")
+DIST_DIR = ROOT / "dist"
+BUILD_DIR = ROOT / "build"
+SPEC_DIR = ROOT / "build_spec"
 
-    # Build PyInstaller command
-    cmd: List[str] = [
-        sys.executable, "-m", "PyInstaller",
+WEB_DIR = ROOT / "web"
+ICON_FILE = ROOT / "toolbox_icon_clean.ico"
+
+RUNTIME_DIRS = [
+    ROOT / "Ghostscript",
+    ROOT / "runtime",
+    ROOT / "poppler_bin",
+]
+
+
+if sys.platform == "win32":
+    os.environ["PYTHONIOENCODING"] = "utf-8"
+
+
+def log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def remove_dir(path: Path) -> None:
+    if path.exists():
+        shutil.rmtree(path, ignore_errors=True)
+        log(f"[CLEAN] Removed: {path}")
+
+
+def ensure_exists(path: Path, desc: str) -> None:
+    if not path.exists():
+        raise FileNotFoundError(f"{desc} 不存在: {path}")
+
+
+def find_pywin32_system32() -> Optional[Path]:
+    try:
+        import pywin32_system32  # type: ignore
+
+        file_attr = getattr(pywin32_system32, "__file__", None)
+        if file_attr:
+            candidate = Path(file_attr).resolve().parent
+            if candidate.exists():
+                return candidate
+    except Exception:
+        pass
+
+    candidates: list[Path] = []
+
+    try:
+        for p in site.getsitepackages():
+            candidates.append(Path(p))
+    except Exception:
+        pass
+
+    try:
+        user_site = site.getusersitepackages()
+        if user_site:
+            candidates.append(Path(user_site))
+    except Exception:
+        pass
+
+    for base in candidates:
+        candidate = base / "pywin32_system32"
+        if candidate.exists():
+            return candidate
+
+    return None
+
+
+def build_pyinstaller_command() -> list[str]:
+    cmd: list[str] = [
+        sys.executable,
+        "-m",
+        "PyInstaller",
+        "--noconfirm",
         "--clean",
-        "--noconfirm", 
         "--onedir",
         "--windowed",
-        str(entry),
-        # Core runtime libraries
-        "--hidden-import=fitz",  
+        "--name",
+        APP_NAME,
+        "--distpath",
+        str(DIST_DIR),
+        "--workpath",
+        str(BUILD_DIR),
+        "--specpath",
+        str(SPEC_DIR),
+        "--hidden-import=eel",
+        "--hidden-import=bottle",
+        "--hidden-import=bottle_websocket",
+        "--hidden-import=bottle.ext.websocket",
+        "--hidden-import=websocket",
+        "--hidden-import=websocket._core",
+        "--hidden-import=tkinter",
+        "--hidden-import=tkinter.filedialog",
+        "--hidden-import=pythoncom",
+        "--hidden-import=pywintypes",
+        "--hidden-import=win32timezone",
+        "--hidden-import=win32api",
+        "--hidden-import=win32con",
+        "--hidden-import=win32gui",
+        "--hidden-import=win32com.client",
+        "--hidden-import=comtypes",
+        "--hidden-import=fitz",
         "--hidden-import=pandas",
         "--hidden-import=openpyxl",
         "--hidden-import=pdfplumber",
         "--hidden-import=docx",
         "--hidden-import=PIL",
-        "--hidden-import=pythoncom",
-        "--hidden-import=pywintypes",
-        # PDF/Word conversion dependencies (supplement)
         "--hidden-import=pdf2docx",
         "--hidden-import=img2pdf",
         "--hidden-import=pypdf",
         "--hidden-import=rapidocr_onnxruntime",
-        # Eel WebSocket dependencies
-        "--hidden-import=bottle_websocket",
-        "--hidden-import=bottle",
-        "--hidden-import=websocket",
-        # COM automation dependencies
-        "--hidden-import=win32api",
-        "--hidden-import=win32gui",
-        "--hidden-import=win32con",
-        "--hidden-import=comtypes",
-        "--hidden-import=win32com.client",
-        # Custom core modules
-        "--hidden-import=core_diff",
-        "--hidden-import=core_invoice",
-        "--hidden-import=core_word_split", 
-        "--hidden-import=core_compress",
-        "--hidden-import=core_word2pdf",
-        "--hidden-import=core_blank_page",  
-        "--hidden-import=core_ocr",         
-        "--hidden-import=core_pdf_cleaner",  # ✨ 新增：去黑边核心功能依赖
-        "--hidden-import=cv2",               # ✨ 新增：OpenCV 图像处理底层依赖
-        "--hidden-import=numpy",             # ✨ 新增：Numpy 矩阵计算依赖
-        # ocrmypdf deep dependencies
+        "--hidden-import=cv2",
+        "--hidden-import=numpy",
         "--hidden-import=ocrmypdf",
-        "--hidden-import=pikepdf",          
-        "--hidden-import=pdfminer",         
-        "--hidden-import=pluggy",           
-        "--collect-all=ocrmypdf",           
-        "--copy-metadata=ocrmypdf",         
-        "--copy-metadata=pikepdf"           
+        "--hidden-import=pikepdf",
+        "--hidden-import=pdfminer",
+        "--hidden-import=pluggy",
+        "--collect-submodules=win32com",
+        "--collect-submodules=pdf2docx",
+        "--collect-submodules=pdfminer",
+        "--collect-all=ocrmypdf",
+        "--copy-metadata=ocrmypdf",
+        "--copy-metadata=pikepdf",
     ]
 
-    # Inject external resource folders
-    web_dir: Path = Path("web")
-    if web_dir.exists():
-        cmd.extend(["--add-data", f"{web_dir};web"])
-        print(f"[OK] Injected Web frontend folder: {web_dir}")
+    pywin32_dll_dir = find_pywin32_system32()
+    if pywin32_dll_dir:
+        cmd.extend(["--add-binary", f"{pywin32_dll_dir};."])
+        log(f"[OK] Added pywin32 DLLs: {pywin32_dll_dir}")
     else:
-        print("[FATAL] Web folder not found!")
+        log("[WARN] 未找到 pywin32_system32，若运行正常可忽略；否则请检查 pywin32 安装")
 
-    dll_dir: Optional[Path] = DependencyChecker.find_pywin32_dll()
-    if dll_dir:
-        cmd.extend(["--add-binary", f"{dll_dir};."])
-        print(f"[OK] Injected DLL path: {dll_dir}")
+    if ICON_FILE.exists():
+        cmd.extend(["--icon", str(ICON_FILE)])
+        log(f"[OK] Added icon: {ICON_FILE}")
 
-    icon: Path = Path("toolbox_icon_clean.ico")
-    if icon.exists():
-        cmd.extend(["--icon", str(icon), "--add-data", f"{icon};."])
-        print(f"[OK] Added icon: {icon}")
+    cmd.append(str(ENTRY))
+    return cmd
 
-    # Execute packaging
-    print(f"\n[INFO] PyInstaller command preview:")
-    print(" " + " ".join(cmd[:8]) + f" ... ({len(cmd)} args total)")
-    print("\n[START] Deep packaging started, please wait...\n")
-    
+
+def copy_dir(src: Path, dst: Path, label: str) -> None:
+    ensure_exists(src, f"{label} 源目录")
+
+    if dst.exists():
+        shutil.rmtree(dst, ignore_errors=True)
+
+    shutil.copytree(src, dst)
+    log(f"[COPY] {label} -> {dst}")
+
+
+def copy_runtime_dirs(app_dir: Path) -> None:
+    for src in RUNTIME_DIRS:
+        copy_dir(src, app_dir / src.name, src.name)
+
+
+def copy_web_dir(app_dir: Path) -> None:
+    copy_dir(WEB_DIR, app_dir / "web", "web")
+
+
+def verify_output(app_dir: Path) -> None:
+    exe_path = app_dir / f"{APP_NAME}.exe"
+    ensure_exists(exe_path, "打包输出 EXE")
+
+    for src in RUNTIME_DIRS:
+        ensure_exists(app_dir / src.name, f"已复制运行时目录 {src.name}")
+
+    ensure_exists(app_dir / "web", "web 前端资源")
+    ensure_exists(app_dir / "web" / "index.html", "web/index.html")
+
+    log(f"[VERIFY] EXE exists: {exe_path}")
+    log("[VERIFY] Runtime folders verified")
+    log("[VERIFY] Web assets verified")
+    log("[SUCCESS] 打包完成，可测试 dist/main/main.exe")
+
+
+def build() -> None:
+    ensure_exists(ENTRY, "入口文件 main.py")
+    ensure_exists(WEB_DIR, "web 目录")
+
+    remove_dir(BUILD_DIR)
+    remove_dir(DIST_DIR)
+    remove_dir(SPEC_DIR)
+
+    cmd = build_pyinstaller_command()
+
+    log("\n[START] Running PyInstaller...\n")
     try:
-        subprocess.run(cmd, check=True)
-        
-        # Physical copy for external engines
-        dist_main: Path = Path("dist/main")
-        if dist_main.exists():
-            print("\n[SYNC] PyInstaller compilation done. Executing physical copy for external engines...")
-            
-            for folder_name in ["Ghostscript", "runtime", "poppler_bin"]:
-                src_folder: Path = Path(folder_name)
-                dst_folder: Path = dist_main / folder_name
-                
-                if src_folder.exists():
-                    if dst_folder.exists():
-                        shutil.rmtree(dst_folder)
-                    
-                    shutil.copytree(src_folder, dst_folder)
-                    print(f"[COPY] Successfully copied: {src_folder} -> {dst_folder}")
-
-        print("\n[SUCCESS] Packaging complete! Test main.exe in dist/main directory.")
-        print("[NOTE] For distribution, compress the entire [main] folder.")
-        
+        subprocess.run(cmd, cwd=ROOT, check=True)
     except subprocess.CalledProcessError as e:
-        print(f"\n[ERROR] Packaging failed with code: {e.returncode}")
-        if e.stderr:
-            print(f"[DETAILS]:\n{e.stderr}")
-    except FileNotFoundError:
-        print("\n[ERROR] pyinstaller not found. Install via: pip install pyinstaller")
-    except Exception as e:
-        print(f"\n[ERROR] Unexpected error: {e}")
+        raise RuntimeError(f"PyInstaller 执行失败，退出码: {e.returncode}") from e
+
+    app_dir = DIST_DIR / APP_NAME
+    ensure_exists(app_dir, "dist 输出目录")
+
+    log("\n[SYNC] Copy runtime folders...\n")
+    copy_runtime_dirs(app_dir)
+
+    log("\n[SYNC] Copy web assets...\n")
+    copy_web_dir(app_dir)
+
+    log("\n[CHECK] Verify package...\n")
+    verify_output(app_dir)
 
 
 if __name__ == "__main__":
-    build()
+    try:
+        build()
+    except Exception as e:
+        log(f"\n[ERROR] {e}")
+        sys.exit(1)

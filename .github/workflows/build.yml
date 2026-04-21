@@ -1,8 +1,14 @@
-name: Build & Release
+name: Build Windows Package
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -11,57 +17,78 @@ permissions:
 jobs:
   build:
     runs-on: windows-latest
-    
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
-      
-      - name: Set up Python
+
+      - name: Set up Python 3.10
         uses: actions/setup-python@v5
         with:
-          python-version: '3.10'
-      
-      - name: Install build dependencies and Build
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
         run: |
-          pip install --upgrade pip
+          python -m pip install --upgrade pip setuptools wheel
           pip install -r requirements.txt
+
+      - name: Build package
+        shell: pwsh
+        run: |
           python build_modern.py
-      
+
       - name: Verify build output
+        shell: pwsh
         run: |
           Write-Host "=== dist/main contents ==="
           Get-ChildItem -Recurse dist\main\
+
           if (Test-Path "dist\main\main.exe") {
-            Write-Host "`n[OK] main.exe found!"
+            Write-Host "`n[OK] main.exe found"
           } else {
-            Write-Error "[FAIL] main.exe NOT found"
+            Write-Error "[FAIL] dist\main\main.exe not found"
             exit 1
           }
+
+          foreach ($dir in @("Ghostscript", "runtime", "poppler_bin", "web")) {
+            if (Test-Path "dist\main\$dir") {
+              Write-Host "[OK] dist\main\$dir found"
+            } else {
+              Write-Error "[FAIL] dist\main\$dir not found"
+              exit 1
+            }
+          }
+
+      - name: Create zip package
         shell: pwsh
-      
-      - name: Create Release Tag and Upload Asset
-        id: release_step
         run: |
-          $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
-          echo "tag=$tag" >> $env:GITHUB_OUTPUT
-          
-          # Create git tag
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-          git tag $tag
-          git push origin $tag
-          
-          # Compress release package
-          $zipName = "Baibaoxiang_$tag.zip"
+          $refName = "${{ github.ref_name }}"
+          if (-not "${{ github.ref }}".StartsWith("refs/tags/")) {
+            $refName = "build_${{ github.run_number }}"
+          }
+
+          $zipName = "Baibaoxiang_${refName}_windows_x64.zip"
+          if (Test-Path $zipName) {
+            Remove-Item $zipName -Force
+          }
+
           Compress-Archive -Path dist\main\* -DestinationPath $zipName -Force
-          Write-Host "Package created: $zipName"
-          Get-ChildItem *.zip
-          
-          echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
-        shell: pwsh
-      
-      - name: Upload Release Asset
+          Write-Host "[OK] Created package: $zipName"
+
+          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: ${{ env.ZIP_NAME }}
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
-          files: ${{ steps.release_step.outputs.ZIP_NAME }}
-          tag_name: ${{ steps.release_step.outputs.tag }}
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: true

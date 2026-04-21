@@ -144,17 +144,33 @@
             </div>
 
             <div id="view-w2p" class="tool-view">
-                <div class="glass-card">
-                    <div class="input-group"><label>输入来源:</label><input type="text" id="w2p-path" readonly><button class="btn-secondary" onclick="selectFolder('w2p-path')">选择</button></div>
-                    <div class="input-group">
-                        <input type="checkbox" id="w2p-doc"><label for="w2p-doc" style="width:auto; margin-left:5px">包含.doc</label>
-                        <input type="checkbox" id="w2p-xls" checked style="margin-left:15px"><label for="w2p-xls" style="width:auto; margin-left:5px">包含Excel</label>
-                        <input type="checkbox" id="w2p-pdfa" style="margin-left:15px"><label for="w2p-pdfa" style="width:auto; margin-left:5px">PDF/A 标准</label>
-                    </div>
-                    <button class="btn-primary" onclick="execTask('w2p', this)">🚀 Office 原生导出</button>
-                </div>
-            </div>
+  <div class="glass-card">
+    <div class="input-group">
+      <label>输入来源:</label>
+      <input
+        type="text"
+        id="w2p-path"
+        readonly
+        placeholder="支持单个 Office 文件或整个文件夹"
+      >
+      <button class="btn-secondary" onclick="selectFile('w2p-path')">选文件</button>
+      <button class="btn-secondary" onclick="selectFolder('w2p-path')" style="margin-left:5px">选文件夹</button>
+    </div>
 
+    <div class="input-group">
+      <input type="checkbox" id="w2p-doc">
+      <label for="w2p-doc" style="width:auto; margin-left:5px">包含.doc</label>
+
+      <input type="checkbox" id="w2p-xls" checked style="margin-left:15px">
+      <label for="w2p-xls" style="width:auto; margin-left:5px">包含Excel</label>
+
+      <input type="checkbox" id="w2p-pdfa" style="margin-left:15px">
+      <label for="w2p-pdfa" style="width:auto; margin-left:5px">PDF/A 标准</label>
+    </div>
+
+    <button class="btn-primary" onclick="execTask('w2p', this)"> Office 原生导出</button>
+  </div>
+</div>
             <div id="view-p2i" class="tool-view">
                 <div class="glass-card">
                     <div class="input-group"><label>PDF 路径:</label><input type="text" id="p2i-path" readonly><button class="btn-secondary" onclick="selectFile('p2i-path')">选择</button></div>
