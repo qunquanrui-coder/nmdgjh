@@ -22,12 +22,11 @@ jobs:
           python-version: '3.10'
       
       - name: Install build dependencies and Build
+        working-directory: Baibaoxiang_Web
         run: |
-          cd Baibaoxiang_Web
           pip install --upgrade pip
           pip install -r requirements.txt
           python build_modern.py
-        shell: cmd
       
       - name: Create Release Tag
         id: tag_version
