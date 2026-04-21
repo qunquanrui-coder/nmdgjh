@@ -16,5 +16,5 @@ ocrmypdf>=16,<18
 pikepdf>=9,<10
 pdfminer.six>=20231228,<2026.0
 pluggy>=1.5,<2
-opencv-python-headless>=4.10,<4.11
+opencv-python-headless>=4.10,<4.14
 numpy>=1.26,<2
