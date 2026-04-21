@@ -29,10 +29,6 @@ jobs:
           python build_modern.py
         shell: cmd
       
-      - name: List dist contents for debugging
-        run: dir /s Baibaoxiang_Web\dist
-        shell: pwsh
-      
       - name: Create Release Tag
         id: tag_version
         run: |
