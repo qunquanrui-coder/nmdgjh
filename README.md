@@ -98,8 +98,8 @@ Baibaoxiang_Web/
 ## ⚠️ 注意事项
 
 - COM 操作（Word 处理）采用线程隔离与排队锁机制，防止 Office 假死
-- 首次运行会自动打开 Chrome 浏览器窗口
-- 打包后的程序需在同一台 Windows 机器上运行（依赖本地 Tesseract/Ghostscript/Poppler）
+- **首次运行会自动打开 Chrome 浏览器窗口**；如果系统未安装 Chrome，Eel 会自动回退到 Edge
+- **打包后的程序目录必须包含以下子文件夹才能正常运行**：`Ghostscript/`、`poppler_bin/`、`runtime/Tesseract/`（这些已随 dist/main/ 一起打包）
 
 ## 📄 License
 
