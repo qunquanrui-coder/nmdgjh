@@ -39,28 +39,29 @@ jobs:
           }
         shell: pwsh
       
-      - name: Compress release package
-        run: |
-          $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
-          Compress-Archive -Path dist\main\* -DestinationPath Baibaoxiang_$tag.zip -Force
-          Write-Host "Package created: Baibaoxiang_$tag.zip"
-          Get-ChildItem *.zip
-          echo "PACKAGE_NAME=Baibaoxiang_$tag.zip" >> $env:GITHUB_OUTPUT
-        shell: pwsh
-      
-      - name: Create Release Tag
-        id: tag_version
+      - name: Create Release Tag and Upload Asset
+        id: release_step
         run: |
           $tag = "v$(Get-Date -Format 'yyyyMMdd.HHmmss')"
           echo "tag=$tag" >> $env:GITHUB_OUTPUT
+          
+          # Create git tag
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           git tag $tag
           git push origin $tag
+          
+          # Compress release package
+          $zipName = "Baibaoxiang_$tag.zip"
+          Compress-Archive -Path dist\main\* -DestinationPath $zipName -Force
+          Write-Host "Package created: $zipName"
+          Get-ChildItem *.zip
+          
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_OUTPUT
         shell: pwsh
       
-      - name: Create Release and Upload Asset
+      - name: Upload Release Asset
         uses: softprops/action-gh-release@v2
         with:
-          files: Baibaoxiang_${{ steps.tag_version.outputs.tag }}.zip
-          tag_name: ${{ steps.tag_version.outputs.tag }}
+          files: ${{ steps.release_step.outputs.ZIP_NAME }}
+          tag_name: ${{ steps.release_step.outputs.tag }}
