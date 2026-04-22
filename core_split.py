@@ -49,14 +49,19 @@ def run_split(path, mode, fixed, parts, start, end):
         # 还原：平均/定长/提取 算法逻辑
         ranges = []
         if mode == "split_avg":
-            p = min(int(parts), total); b, r = total // p, total % p
+            p = min(max(1, int(parts)), total); b, r = total // p, total % p
             cur = 1
             for i in range(p):
                 sz = b + (1 if i < r else 0); ranges.append((cur, cur+sz-1)); cur += sz
         elif mode == "split_fixed":
             step = max(1, int(fixed))
             for i in range(1, total + 1, step): ranges.append((i, min(i+step-1, total)))
-        elif mode == "extract": ranges = [(max(1, int(start)), min(int(end), total))]
+        elif mode == "extract":
+            s, e = max(1, int(start)), min(int(end), total)
+            if s > e: return {"status": "error", "msg": "提取范围无效：起始页不能大于结束页"}
+            ranges = [(s, e)]
+        else:
+            return {"status": "error", "msg": f"未知拆分模式: {mode}"}
         
         for idx, (s, e) in enumerate(ranges, 1):
             new_doc = fitz.open()

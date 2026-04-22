@@ -17,9 +17,13 @@ def _png_to_white_jpeg_bytes(p):
 def run_img2pdf(path, recursive, include_root):
     try:
         root_folder = Path(path).resolve()
+        if not root_folder.is_dir():
+            return {"status": "error", "msg": "请选择有效的图片文件夹"}
+
         targets = [d for d in root_folder.rglob("*") if d.is_dir()] if recursive else [root_folder]
         if recursive and include_root: targets.insert(0, root_folder)
-        
+
+        converted_count = 0
         for folder in targets:
             imgs = sorted([p for p in folder.iterdir() if p.suffix.lower() in (".jpg",".png",".bmp")], key=lambda p: [int(t) if t.isdigit() else t.lower() for t in re.split(r"([0-9]+)", p.name)])
             if not imgs: continue
@@ -28,5 +32,11 @@ def run_img2pdf(path, recursive, include_root):
             inputs = [_png_to_white_jpeg_bytes(p) if p.suffix.lower() == ".png" else str(p) for p in imgs]
             with open(folder / f"{folder.name}.pdf", "wb") as f:
                 img2pdf.convert(inputs, outputstream=f)
-        return {"status": "success"}
+
+            converted_count += 1
+
+        if converted_count == 0:
+            return {"status": "error", "msg": "未找到可转换的图片文件"}
+
+        return {"status": "success", "msg": f"共生成 {converted_count} 个 PDF"}
     except Exception as e: return {"status": "error", "msg": str(e)}

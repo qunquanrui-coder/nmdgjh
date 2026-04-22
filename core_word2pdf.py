@@ -177,6 +177,9 @@ def run_word2pdf(
             excel.Visible = 0
             excel.DisplayAlerts = 0
 
+        success_count = 0
+        failed_items: List[str] = []
+
         for i, src in enumerate(files, 1):
             tmp_out: Optional[Path] = None
             keep_tmp = False
@@ -214,18 +217,23 @@ def run_word2pdf(
 
                 if _atomic_replace(tmp_out, out):
                     eel.update_terminal(f"[√] 完成: {out.name}")
+                    success_count += 1
                 else:
                     keep_tmp = True
                     eel.update_terminal(f"[!] 文件占用，已保留临时结果: {tmp_out.name}")
+                    success_count += 1
 
             except pywintypes.com_error as e:
                 eel.update_terminal(f"❌ 失败 {src.name}: COM 交互错误 {e}")
+                failed_items.append(src.name)
 
             except PermissionError as e:
                 eel.update_terminal(f"❌ 失败 {src.name}: 权限不足 {e}")
+                failed_items.append(src.name)
 
             except Exception as e:
                 eel.update_terminal(f"❌ 失败 {src.name}: {e}")
+                failed_items.append(src.name)
 
             finally:
                 _safe_close_doc(doc)
@@ -239,7 +247,21 @@ def run_word2pdf(
                 if i % 10 == 0:
                     gc.collect()
 
-        return {"status": "success", "msg": f"共处理 {len(files)} 个文件", "data": None}
+        if failed_items and success_count == 0:
+            return {
+                "status": "error",
+                "msg": f"全部转换失败，共 {len(failed_items)} 个文件。请查看终端日志。",
+                "data": {"success": success_count, "failed": failed_items},
+            }
+
+        if failed_items:
+            return {
+                "status": "error",
+                "msg": f"部分转换完成：成功 {success_count} 个，失败 {len(failed_items)} 个。请查看终端日志。",
+                "data": {"success": success_count, "failed": failed_items},
+            }
+
+        return {"status": "success", "msg": f"共成功转换 {success_count} 个文件", "data": None}
 
     except Exception as e:
         error_msg = traceback.format_exc()

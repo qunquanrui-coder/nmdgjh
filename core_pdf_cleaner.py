@@ -39,66 +39,71 @@ def run_pdf_cleaner(path_str: str):
             else:
                 out_path = output_dir / pdf_path.name
 
-            doc = fitz.open(str(pdf_path))
-            total_pages = len(doc)
-            
-            for page_num in range(total_pages):
-                if page_num % 10 == 0:
-                    eel.update_terminal(f"  └─ 正在扫描页面 {page_num + 1}/{total_pages}...")
-                    time.sleep(0.01)
-                
-                page = doc[page_num]
-                page.set_cropbox(page.mediabox)
-                
-                pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
-                
-                if pix.n >= 3:
-                    gray = cv2.cvtColor(img_data, cv2.COLOR_RGB2GRAY)
-                else:
-                    gray = img_data
+            doc = None
+            try:
+                doc = fitz.open(str(pdf_path))
+                total_pages = len(doc)
 
-                thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 51, 15)
-                contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-                
-                h_img, w_img = thresh.shape
-                edge_dist_x = int(w_img * 0.03)
-                edge_dist_y = int(h_img * 0.03)
-                
-                valid_x, valid_y = [], []
-                
-                for cnt in contours:
-                    x, y, w, h = cv2.boundingRect(cnt)
-                    if w * h < 15: continue
-                    if (x <= edge_dist_x or (x + w) >= (w_img - edge_dist_x) or 
-                        y <= edge_dist_y or (y + h) >= (h_img - edge_dist_y)):
-                        continue
-                    valid_x.extend([x, x + w])
-                    valid_y.extend([y, y + h])
-                    
-                if valid_x and valid_y:
-                    min_x, max_x = min(valid_x), max(valid_x)
-                    min_y, max_y = min(valid_y), max(valid_y)
-                    
-                    scale = 2.0
-                    pdf_min_x = max(0, min_x / scale - 5)
-                    pdf_max_x = min(page.rect.width, max_x / scale + 5)
-                    pdf_min_y = max(0, min_y / scale - 5)
-                    pdf_max_y = min(page.rect.height, max_y / scale + 5)
-                    
-                    r_top = fitz.Rect(0, 0, page.rect.width, pdf_min_y)
-                    r_bottom = fitz.Rect(0, pdf_max_y, page.rect.width, page.rect.height)
-                    r_left = fitz.Rect(0, pdf_min_y, pdf_min_x, pdf_max_y)
-                    r_right = fitz.Rect(pdf_max_x, pdf_min_y, page.rect.width, pdf_max_y)
-                    
-                    for r in [r_top, r_bottom, r_left, r_right]:
-                        if r.width > 0 and r.height > 0:
-                            page.draw_rect(r, color=None, fill=(1, 1, 1))
-                else:
-                    page.draw_rect(page.rect, color=None, fill=(1, 1, 1))
-                    
-            doc.save(str(out_path))
-            doc.close()
+                for page_num in range(total_pages):
+                    if page_num % 10 == 0:
+                        eel.update_terminal(f"  └─ 正在扫描页面 {page_num + 1}/{total_pages}...")
+                        time.sleep(0.01)
+
+                    page = doc[page_num]
+                    page.set_cropbox(page.mediabox)
+
+                    pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
+                    img_data = np.frombuffer(pix.samples, dtype=np.uint8).reshape(pix.h, pix.w, pix.n)
+
+                    if pix.n >= 3:
+                        gray = cv2.cvtColor(img_data, cv2.COLOR_RGB2GRAY)
+                    else:
+                        gray = img_data
+
+                    thresh = cv2.adaptiveThreshold(gray, 255, cv2.ADAPTIVE_THRESH_GAUSSIAN_C, cv2.THRESH_BINARY_INV, 51, 15)
+                    contours, _ = cv2.findContours(thresh, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
+
+                    h_img, w_img = thresh.shape
+                    edge_dist_x = int(w_img * 0.03)
+                    edge_dist_y = int(h_img * 0.03)
+
+                    valid_x, valid_y = [], []
+
+                    for cnt in contours:
+                        x, y, w, h = cv2.boundingRect(cnt)
+                        if w * h < 15: continue
+                        if (x <= edge_dist_x or (x + w) >= (w_img - edge_dist_x) or
+                            y <= edge_dist_y or (y + h) >= (h_img - edge_dist_y)):
+                            continue
+                        valid_x.extend([x, x + w])
+                        valid_y.extend([y, y + h])
+
+                    if valid_x and valid_y:
+                        min_x, max_x = min(valid_x), max(valid_x)
+                        min_y, max_y = min(valid_y), max(valid_y)
+
+                        scale = 2.0
+                        pdf_min_x = max(0, min_x / scale - 5)
+                        pdf_max_x = min(page.rect.width, max_x / scale + 5)
+                        pdf_min_y = max(0, min_y / scale - 5)
+                        pdf_max_y = min(page.rect.height, max_y / scale + 5)
+
+                        r_top = fitz.Rect(0, 0, page.rect.width, pdf_min_y)
+                        r_bottom = fitz.Rect(0, pdf_max_y, page.rect.width, page.rect.height)
+                        r_left = fitz.Rect(0, pdf_min_y, pdf_min_x, pdf_max_y)
+                        r_right = fitz.Rect(pdf_max_x, pdf_min_y, page.rect.width, pdf_max_y)
+
+                        for r in [r_top, r_bottom, r_left, r_right]:
+                            if r.width > 0 and r.height > 0:
+                                page.draw_rect(r, color=None, fill=(1, 1, 1))
+                    else:
+                        page.draw_rect(page.rect, color=None, fill=(1, 1, 1))
+
+                doc.save(str(out_path))
+            finally:
+                if doc is not None:
+                    doc.close()
+
             success_count += 1
             eel.update_terminal(f"  └─ ✅ 保存成功: {out_path.name}")
 
