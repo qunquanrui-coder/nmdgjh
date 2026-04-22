@@ -1,0 +1,109 @@
+name: Build Windows Package
+
+on:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    env:
+      PYTHONIOENCODING: utf-8
+      PYTHONUTF8: "1"
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.10
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+          cache: "pip"
+          cache-dependency-path: requirements.txt
+
+      - name: Install dependencies
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: |
+          python -m pip install --upgrade pip setuptools wheel
+          python -m pip install -r requirements.txt
+
+      - name: Build package
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: |
+          python build_modern.py
+
+      - name: Verify build output
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: |
+          Write-Host "=== dist/main contents ==="
+          Get-ChildItem -Recurse dist\main\
+
+          if (Test-Path "dist\main\main.exe") {
+            Write-Host "`n[OK] main.exe found"
+          } else {
+            Write-Error "[FAIL] dist\main\main.exe not found"
+            exit 1
+          }
+
+          foreach ($dir in @("Ghostscript", "runtime", "poppler_bin", "web")) {
+            if (Test-Path "dist\main\$dir") {
+              Write-Host "[OK] dist\main\$dir found"
+            } else {
+              Write-Error "[FAIL] dist\main\$dir not found"
+              exit 1
+            }
+          }
+
+      - name: Create zip package
+        shell: pwsh
+        env:
+          PYTHONIOENCODING: utf-8
+          PYTHONUTF8: "1"
+        run: |
+          $refName = "${{ github.ref_name }}"
+          if (-not "${{ github.ref }}".StartsWith("refs/tags/")) {
+            $refName = "build_${{ github.run_number }}"
+          }
+
+          $zipName = "Baibaoxiang_${refName}_windows_x64.zip"
+          if (Test-Path $zipName) {
+            Remove-Item $zipName -Force
+          }
+
+          Compress-Archive -Path dist\main\* -DestinationPath $zipName -Force
+          Write-Host "[OK] Created package: $zipName"
+
+          "ZIP_NAME=$zipName" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append
+
+      - name: Upload package artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-package
+          path: ${{ env.ZIP_NAME }}
+
+      - name: Publish GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: ${{ env.ZIP_NAME }}
+          generate_release_notes: true
