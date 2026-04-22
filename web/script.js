@@ -155,6 +155,11 @@ function switchView(viewId, element) {
   }
 }
 
+function openDashboardTool(viewId) {
+  const navItem = document.querySelector(`.nav-item[onclick*="'${viewId}'"]`);
+  switchView(viewId, navItem);
+}
+
 /**
  * 4. 基础文件/文件夹选择联动
  */

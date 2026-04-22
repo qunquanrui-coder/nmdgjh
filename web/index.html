@@ -68,6 +68,72 @@
                         <small>离线优先，批量处理</small>
                     </div>
                 </div>
+
+                <div class="dashboard-section">
+                    <div class="section-heading">
+                        <h3>常用工具</h3>
+                        <span>选择一个入口后直接进入对应处理页</span>
+                    </div>
+                    <div class="quick-tool-grid">
+                        <button class="quick-tool-card" type="button" onclick="openDashboardTool('p2w')">
+                            <span class="quick-tool-icon">📝</span>
+                            <strong>PDF 提取 Word</strong>
+                            <small>可编辑或纯图模式</small>
+                        </button>
+                        <button class="quick-tool-card" type="button" onclick="openDashboardTool('rmblank')">
+                            <span class="quick-tool-icon">🧹</span>
+                            <strong>空白页清理</strong>
+                            <small>Word / PDF 批量处理</small>
+                        </button>
+                        <button class="quick-tool-card" type="button" onclick="openDashboardTool('split')">
+                            <span class="quick-tool-icon">✂️</span>
+                            <strong>PDF 精准拆分</strong>
+                            <small>定长、平均拆分</small>
+                        </button>
+                        <button class="quick-tool-card" type="button" onclick="openDashboardTool('ocr')">
+                            <span class="quick-tool-icon">📄</span>
+                            <strong>PDF OCR 增强</strong>
+                            <small>生成可搜索 PDF</small>
+                        </button>
+                    </div>
+                </div>
+
+                <div class="dashboard-section">
+                    <div class="section-heading">
+                        <h3>本地能力</h3>
+                        <span>核心运行组件随发布包一起提供</span>
+                    </div>
+                    <div class="runtime-grid">
+                        <div class="runtime-item">
+                            <span class="runtime-dot"></span>
+                            <div>
+                                <strong>Office 导出</strong>
+                                <small>Word / Excel 转 PDF 与文档处理</small>
+                            </div>
+                        </div>
+                        <div class="runtime-item">
+                            <span class="runtime-dot"></span>
+                            <div>
+                                <strong>Ghostscript</strong>
+                                <small>PDF 压缩与优化处理</small>
+                            </div>
+                        </div>
+                        <div class="runtime-item">
+                            <span class="runtime-dot"></span>
+                            <div>
+                                <strong>Poppler / PyMuPDF</strong>
+                                <small>PDF 渲染、拆分与图片转换</small>
+                            </div>
+                        </div>
+                        <div class="runtime-item">
+                            <span class="runtime-dot"></span>
+                            <div>
+                                <strong>Tesseract / OCR</strong>
+                                <small>扫描件识别与发票信息提取</small>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
 
             <div id="view-pdfclean" class="tool-view">
