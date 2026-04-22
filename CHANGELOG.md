@@ -2,6 +2,8 @@
 
 ## v1.5
 
+- 将 Windows 打包产物从 `main.exe` 更名为 `QuanQuanTreasureBox.exe`。
+- 补齐 Windows 文件版本信息，产品名统一为“泉泉的百宝箱”。
 - 迁移到 pywebview 桌面壳，使用本地 Web 前端作为主界面。
 - 引入 bridge / app_api 前后端桥接层，统一前端调用入口。
 - 完善 Word / Excel COM 类任务的串行执行与资源释放。

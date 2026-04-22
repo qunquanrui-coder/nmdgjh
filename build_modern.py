@@ -4,12 +4,13 @@ build_modern.py
 pywebview 版稳定打包脚本（Windows / Python 3.10）
 
 目标：
-1. 固定输出 dist/main/main.exe
-2. 物理复制 web 前端资源到 dist/main/web
+1. 固定输出 dist/QuanQuanTreasureBox/QuanQuanTreasureBox.exe
+2. 物理复制 web 前端资源到 dist/QuanQuanTreasureBox/web
 3. 自动补充 pywin32 DLL
 4. 打包后物理复制 Ghostscript / runtime / poppler_bin
 5. 尽量避免把 Qt / GTK / CEF 等不需要的 pywebview 后端打进来
 6. 修复 GitHub Actions / Windows 控制台中文日志编码报错
+7. 写入 Windows 文件版本信息，便于发布、快捷方式和企业分发识别
 """
 
 from __future__ import annotations
@@ -45,11 +46,17 @@ if sys.platform == "win32":
 
 ROOT = Path(__file__).resolve().parent
 ENTRY = ROOT / "main.py"
-APP_NAME = "main"
+APP_NAME = "QuanQuanTreasureBox"
+APP_DISPLAY_NAME = "泉泉的百宝箱"
+APP_DESCRIPTION = "泉泉的百宝箱 - 本地桌面文档工具箱"
+APP_COMPANY = "qunquanrui-coder"
+APP_COPYRIGHT = "Copyright (c) 2026 qunquanrui-coder. All rights reserved."
+APP_VERSION = os.environ.get("APP_VERSION", "1.5.0")
 
 DIST_DIR = ROOT / "dist"
 BUILD_DIR = ROOT / "build"
 SPEC_DIR = ROOT / "build_spec"
+VERSION_FILE = SPEC_DIR / "version_info.txt"
 
 WEB_DIR = ROOT / "web"
 ICON_FILE = ROOT / "toolbox_icon_clean.ico"
@@ -78,6 +85,71 @@ def remove_dir(path: Path) -> None:
 def ensure_exists(path: Path, desc: str) -> None:
     if not path.exists():
         raise FileNotFoundError(f"{desc} 不存在: {path}")
+
+
+def normalize_version(version: str) -> tuple[int, int, int, int]:
+    cleaned = version.strip().lstrip("vV")
+    parts: list[int] = []
+    for part in cleaned.split("."):
+        digits = "".join(ch for ch in part if ch.isdigit())
+        if digits:
+            parts.append(int(digits))
+
+    while len(parts) < 4:
+        parts.append(0)
+
+    return tuple(parts[:4])
+
+
+def format_version_tuple(version_tuple: tuple[int, int, int, int]) -> str:
+    major, minor, patch, build = version_tuple
+    if build:
+        return f"{major}.{minor}.{patch}.{build}"
+    return f"{major}.{minor}.{patch}"
+
+
+def create_version_file() -> Path:
+    version_tuple = normalize_version(APP_VERSION)
+    version_text = format_version_tuple(version_tuple)
+
+    SPEC_DIR.mkdir(parents=True, exist_ok=True)
+    VERSION_FILE.write_text(
+        f"""# UTF-8
+VSVersionInfo(
+  ffi=FixedFileInfo(
+    filevers={version_tuple},
+    prodvers={version_tuple},
+    mask=0x3f,
+    flags=0x0,
+    OS=0x40004,
+    fileType=0x1,
+    subtype=0x0,
+    date=(0, 0)
+  ),
+  kids=[
+    StringFileInfo([
+      StringTable(
+        '080404B0',
+        [
+          StringStruct('CompanyName', '{APP_COMPANY}'),
+          StringStruct('FileDescription', '{APP_DESCRIPTION}'),
+          StringStruct('FileVersion', '{version_text}'),
+          StringStruct('InternalName', '{APP_NAME}'),
+          StringStruct('LegalCopyright', '{APP_COPYRIGHT}'),
+          StringStruct('OriginalFilename', '{APP_NAME}.exe'),
+          StringStruct('ProductName', '{APP_DISPLAY_NAME}'),
+          StringStruct('ProductVersion', '{version_text}')
+        ]
+      )
+    ]),
+    VarFileInfo([VarStruct('Translation', [2052, 1200])])
+  ]
+)
+""",
+        encoding="utf-8",
+    )
+    log(f"[OK] Windows version info: {VERSION_FILE} ({version_text})")
+    return VERSION_FILE
 
 
 def find_pywin32_system32() -> Optional[Path]:
@@ -222,6 +294,10 @@ def build_pyinstaller_command() -> list[str]:
         cmd.extend(["--icon", str(ICON_FILE)])
         log(f"[OK] Added icon: {ICON_FILE}")
 
+    if VERSION_FILE.exists():
+        cmd.extend(["--version-file", str(VERSION_FILE)])
+        log(f"[OK] Added Windows version info: {VERSION_FILE}")
+
     cmd.append(str(ENTRY))
     return cmd
 
@@ -258,7 +334,7 @@ def verify_output(app_dir: Path) -> None:
     log(f"[VERIFY] EXE exists: {exe_path}")
     log("[VERIFY] Runtime folders verified")
     log("[VERIFY] Web assets verified")
-    log("[SUCCESS] 打包完成，可测试 dist/main/main.exe")
+    log(f"[SUCCESS] 打包完成，可测试 dist/{APP_NAME}/{APP_NAME}.exe")
 
 
 def build() -> None:
@@ -269,6 +345,7 @@ def build() -> None:
     remove_dir(DIST_DIR)
     remove_dir(SPEC_DIR)
 
+    create_version_file()
     cmd = build_pyinstaller_command()
 
     log("\n[START] Running PyInstaller...\n")

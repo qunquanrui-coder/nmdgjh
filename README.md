@@ -54,14 +54,14 @@ python main.py
 python build_modern.py
 ```
 
-打包脚本会清理旧构建产物，调用 PyInstaller，复制前端资源和运行时目录，并校验 `dist/main/main.exe` 及关键资源是否完整。
+打包脚本会清理旧构建产物，调用 PyInstaller，复制前端资源和运行时目录，并校验 `dist/QuanQuanTreasureBox/QuanQuanTreasureBox.exe` 及关键资源是否完整。
 
 打包结果默认位于：
 
 ```text
 dist/
-└─ main/
-   ├─ main.exe
+└─ QuanQuanTreasureBox/
+   ├─ QuanQuanTreasureBox.exe
    ├─ web/
    ├─ Ghostscript/
    ├─ runtime/
