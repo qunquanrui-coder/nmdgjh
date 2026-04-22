@@ -1,4 +1,4 @@
-# 泉泉大人的工具合集（Baibaoxiang Web）
+# 泉泉的百宝箱
 
 一个面向 Windows 办公场景的本地桌面文档工具箱，聚焦 PDF、Word、Excel、OCR、发票整理与批量文档处理。
 
@@ -30,9 +30,12 @@
 
 仓库中已包含打包所需的 `Ghostscript/`、`runtime/`、`poppler_bin/` 和 `web/` 目录，`build_modern.py` 会在打包时同步这些资源。
 
-## 安装与启动
+## 下载与启动
 
-安装 Python 依赖：
+普通用户建议直接在 [Releases](https://github.com/qunquanrui-coder/nmdgjh/releases) 下载最新 Windows 压缩包，解压后运行 `QuanQuanTreasureBox.exe`。
+
+源码运行时，先安装 Python 依赖：
+
 
 ```bash
 pip install -r requirements.txt

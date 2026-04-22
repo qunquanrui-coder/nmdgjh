@@ -71,7 +71,17 @@ function showToast(message, type = "info") {
 
   const toast = document.createElement("div");
   toast.className = `toast ${type}`;
-  toast.innerHTML = `${icons[type] || icons.info}${message}`;
+
+  const icon = document.createElement("span");
+  icon.className = "toast-icon";
+  icon.textContent = icons[type] || icons.info;
+
+  const text = document.createElement("span");
+  text.className = "toast-message";
+  text.textContent = message;
+
+  toast.appendChild(icon);
+  toast.appendChild(text);
   container.appendChild(toast);
 
   setTimeout(() => {

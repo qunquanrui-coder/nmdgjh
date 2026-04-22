@@ -72,7 +72,7 @@ def start_app() -> None:
     api = app_api.AppApi()
 
     window = webview.create_window(
-        title="泉泉大人的百宝箱",
+        title="泉泉的百宝箱",
         url=str(INDEX_FILE.resolve()),   # 关键：传绝对路径，不再传相对路径
         js_api=api,
         width=1280,

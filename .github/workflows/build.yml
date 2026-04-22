@@ -80,6 +80,26 @@ jobs:
             Write-Host "[OK] FileDescription: $($version.FileDescription)"
             Write-Host "[OK] ProductVersion: $($version.ProductVersion)"
             Write-Host "[OK] FileVersion: $($version.FileVersion)"
+
+            if ($version.ProductName -ne "${{ env.APP_DISPLAY_NAME }}") {
+              Write-Error "[FAIL] ProductName mismatch: expected '${{ env.APP_DISPLAY_NAME }}', got '$($version.ProductName)'"
+              exit 1
+            }
+
+            if ($version.FileDescription -ne "${{ env.APP_DISPLAY_NAME }} - 本地桌面文档工具箱") {
+              Write-Error "[FAIL] FileDescription mismatch: $($version.FileDescription)"
+              exit 1
+            }
+
+            if ($version.ProductVersion -ne "$env:APP_VERSION") {
+              Write-Error "[FAIL] ProductVersion mismatch: expected '$env:APP_VERSION', got '$($version.ProductVersion)'"
+              exit 1
+            }
+
+            if ($version.FileVersion -ne "$env:APP_VERSION") {
+              Write-Error "[FAIL] FileVersion mismatch: expected '$env:APP_VERSION', got '$($version.FileVersion)'"
+              exit 1
+            }
           } else {
             Write-Error "[FAIL] $exePath not found"
             exit 1
