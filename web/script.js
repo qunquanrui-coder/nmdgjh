@@ -120,21 +120,21 @@ function switchView(viewId, element) {
   }
 
   const titleMap = {
-    dashboard: ["运行概览", "系统状态与近期活动"],
-    rmblank: ["Word 空白页清理", "绝对物理切片，专治各种幽灵排版"],
+    dashboard: ["运行概览", "百宝箱状态与近期活动"],
+    rmblank: ["Word 空白页清理", "识别并清理文档中的空白页面"],
     pdfclean: ["扫描件去黑边", "基于 OpenCV 智能识别并遮盖扫描仪产生的黑边"],
     p2w: ["PDF 提取 Word", "支持可编辑与纯图双模式"],
     split: ["PDF 精准拆分", "定长、平均、全拆与范围提取"],
     wsplit: ["Word 目录拆解", "按大纲级别一键拆分为独立文档"],
-    wmerge: ["Word 批量合并", "带 A 级剪贴板清理的静默合成"],
+    wmerge: ["Word 批量合并", "按自然顺序合并多个 Word 文档"],
     unlock: ["PDF 权限解密", "移除打印、复制及编辑限制"],
-    comp: ["文档极限瘦身", "二分法自动调参 PDF/Word 压缩引擎"],
+    comp: ["文档极限瘦身", "按目标大小自动选择压缩结果"],
     ocr: ["PDF OCR 增强", "强制 OCR 重新扫描，生成透明文本层"],
-    i2p: ["图像转编 PDF", "自然排序递归打包"],
+    i2p: ["图像转 PDF", "按自然顺序合并图片生成 PDF"],
     w2p: ["Word 转 PDF", "Office 原生内核导出"],
-    p2i: ["PDF 转图片", "Acrobat 换页对齐专用渲染"],
-    inv: ["发票自动提取", "OCR 结构化对账提取"],
-    diff: ["文档差异比对", "Word/Excel 双文本深度分析"],
+    p2i: ["PDF 转图片", "将 PDF 页面渲染为 JPG 图片"],
+    inv: ["发票自动提取", "提取发票信息并汇总为 Excel"],
+    diff: ["文档差异比对", "生成 Word / Excel 差异报告"],
   };
 
   if (titleMap[viewId]) {

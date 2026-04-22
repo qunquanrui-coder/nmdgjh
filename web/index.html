@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <title>泉泉大人的工具合集</title>
+    <title>泉泉大人的百宝箱</title>
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -12,8 +12,8 @@
         <aside class="sidebar">
             <div class="logo-area">
                 <div class="brand-mark">泉</div>
-                <h2>泉泉大人的工具合集</h2>
-                <div class="sys-status"><span class="dot"></span> CORE ONLINE | LOCAL</div>
+                <h2>泉泉大人的百宝箱</h2>
+                <div class="sys-status"><span class="dot"></span> 本地引擎已就绪</div>
             </div>
 
             <nav class="nav-menu">
@@ -31,7 +31,7 @@
 
                 <div class="nav-group">转换与 OCR</div>
                 <a href="#" class="nav-item" onclick="switchView('ocr', this)">📄 PDF OCR 增强</a>
-                <a href="#" class="nav-item" onclick="switchView('i2p', this)">🖼️ 图像转编 PDF</a>
+                <a href="#" class="nav-item" onclick="switchView('i2p', this)">🖼️ 图像转 PDF</a>
                 <a href="#" class="nav-item" onclick="switchView('w2p', this)">📄 Word 转 PDF</a>
                 <a href="#" class="nav-item" onclick="switchView('p2i', this)">📷 PDF 转图片</a>
                 <a href="#" class="nav-item" onclick="switchView('inv', this)">🧾 发票自动提取</a>
@@ -42,15 +42,15 @@
         <main class="main-content">
             <header>
                 <h1 id="page-title">运行概览</h1>
-                <p class="subtitle" id="page-subtitle">系统状态与近期活动</p>
+                <p class="subtitle" id="page-subtitle">百宝箱状态与近期活动</p>
             </header>
 
             <div id="view-dashboard" class="tool-view active">
                 <div class="dashboard-grid">
                     <div class="glass-card hero-panel">
-                        <div class="panel-kicker">Baibaoxiang Console</div>
-                        <h3>本地文档处理核心已就绪</h3>
-                        <p>PDF、Word、Excel、OCR 与发票处理模块已加载。选择左侧工具后，任务日志会在下方持续回传。</p>
+                        <div class="panel-kicker">泉泉大人的百宝箱</div>
+                        <h3>本地文档处理已就绪</h3>
+                        <p>PDF、Word、Excel、OCR 与发票处理工具已加载。选择左侧工具后，处理日志会在下方持续显示。</p>
                     </div>
                     <div class="metric-card">
                         <span>文档处理</span>
@@ -64,7 +64,7 @@
                     </div>
                     <div class="metric-card accent-card">
                         <span>运行模式</span>
-                        <strong>LOCAL</strong>
+                        <strong>本地</strong>
                         <small>离线优先，批量处理</small>
                     </div>
                 </div>
@@ -315,9 +315,9 @@
             </div>
 
             <div class="terminal-container">
-                <div class="terminal-header">TASK LOG // LOCAL ENGINE</div>
+                <div class="terminal-header">处理日志 // 本地引擎</div>
                 <div class="terminal-body" id="terminal">
-                    <div>[✓] Baibaoxiang local kernel initialized.</div>
+                    <div>[✓] 百宝箱本地引擎已就绪。</div>
                 </div>
             </div>
         </main>
