@@ -51,7 +51,7 @@ APP_DISPLAY_NAME = "泉泉的百宝箱"
 APP_DESCRIPTION = "泉泉的百宝箱 - 本地桌面文档工具箱"
 APP_COMPANY = "qunquanrui-coder"
 APP_COPYRIGHT = "Copyright (c) 2026 qunquanrui-coder. All rights reserved."
-APP_VERSION = os.environ.get("APP_VERSION", "2.1.0")
+APP_VERSION = os.environ.get("APP_VERSION", "2.1.1")
 
 DIST_DIR = ROOT / "dist"
 BUILD_DIR = ROOT / "build"

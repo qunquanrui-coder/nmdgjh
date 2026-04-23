@@ -97,6 +97,13 @@ def _collect_target_pdfs(target_path: Path, recursive: bool) -> list[Path]:
 def _collect_images(folder: Path) -> list[Path]:
     return sorted(
         (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() in IMAGE_SUFFIXES),
+        key=_image_order_key,
+    )
+
+
+def _collect_source_pdfs(folder: Path) -> list[Path]:
+    return sorted(
+        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"),
         key=_natural_key,
     )
 
@@ -105,6 +112,13 @@ def _default_source_indexes(source_count: int, target_count: int) -> list[int]:
     if source_count < 1:
         return []
     return list(range(min(source_count, max(1, target_count))))
+
+
+def _image_order_key(path: Path):
+    numbers = [int(m.group(1)) for m in FILENAME_NUMBER_RE.finditer(_normalize_filename_for_pages(path))]
+    if numbers:
+        return (0, numbers[0], _natural_key(path))
+    return (1, _natural_key(path))
 
 
 def _normalize_filename_for_pages(path: Path) -> str:
@@ -369,6 +383,46 @@ def _replace_pages_by_filename_image_mapping(
         target_doc.close()
 
 
+def _replace_one_target_with_source_pdf_folder(
+    target_pdf: Path,
+    output_dir: Path,
+    target_pages: str,
+    source_folder: Path,
+    source_pages: str,
+) -> dict:
+    source_pdfs = [p for p in _collect_source_pdfs(source_folder) if p.resolve() != target_pdf.resolve()]
+    if not source_pdfs:
+        return {"handled": False}
+
+    bridge.update_terminal(f"[*] 检测到替换来源文件夹内有 {len(source_pdfs)} 个 PDF，将分别生成结果文件")
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    success_count = 0
+    failed: list[str] = []
+    for idx, source_pdf in enumerate(source_pdfs, 1):
+        output_path = _unique_output_path(output_dir / source_pdf.name)
+        bridge.update_terminal(f"[*] 正在生成 ({idx}/{len(source_pdfs)}): {source_pdf.name}")
+        try:
+            _replace_pages_in_one_pdf(target_pdf, output_path, target_pages, source_pdf, source_pages)
+            success_count += 1
+            bridge.update_terminal(f"  └─ ✅ 保存成功: {output_path}")
+        except Exception as exc:
+            failed.append(f"{source_pdf.name}: {exc}")
+            bridge.update_terminal(f"  └─ [x] 失败: {source_pdf.name} - {exc}")
+
+    if success_count == 0:
+        return {
+            "handled": True,
+            "status": "error",
+            "msg": "没有成功生成任何结果；" + "；".join(failed[:3]),
+        }
+
+    msg = f"成功生成 {success_count}/{len(source_pdfs)} 个结果文件"
+    if failed:
+        msg += f"，失败 {len(failed)} 个"
+    return {"handled": True, "status": "success", "msg": msg}
+
+
 @bridge.expose
 def run_pdf_replace(
     target_path_text: str,
@@ -377,6 +431,7 @@ def run_pdf_replace(
     source_pages: str = "",
     recursive: bool = False,
     auto_name_pages: bool = False,
+    source_folder_mode: str = "auto",
 ):
     try:
         if not (target_path_text or "").strip():
@@ -389,6 +444,28 @@ def run_pdf_replace(
 
         if not source_path.exists():
             return {"status": "error", "msg": "替换来源不存在，请选择图片、图片文件夹或 PDF"}
+
+        if source_folder_mode not in {"auto", "pages", "variants"}:
+            source_folder_mode = "auto"
+
+        if target_path.is_file() and source_path.is_dir() and not auto_name_pages and source_folder_mode != "pages":
+            output_dir = target_path.parent / f"{target_path.stem}_换页结果"
+            source_folder_result = _replace_one_target_with_source_pdf_folder(
+                target_path,
+                output_dir,
+                target_pages,
+                source_path,
+                source_pages,
+            )
+            if source_folder_result.get("handled"):
+                return {
+                    "status": source_folder_result["status"],
+                    "msg": source_folder_result["msg"],
+                    "data": str(output_dir),
+                }
+
+        if source_path.is_dir() and source_folder_mode == "variants":
+            return {"status": "error", "msg": "多 PDF 分别生成模式需要替换来源文件夹内包含 PDF 文件"}
 
         pdf_files = _collect_target_pdfs(target_path, bool(recursive))
         output_root = target_path.parent if target_path.is_file() else target_path / "已换页"

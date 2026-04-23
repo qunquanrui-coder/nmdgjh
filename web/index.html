@@ -165,11 +165,19 @@
                         <label>替换来源:</label>
                         <input type="text" id="pdfreplace-source" readonly placeholder="支持图片、图片文件夹或 PDF">
                         <button class="btn-secondary" onclick="selectFile('pdfreplace-source')">选文件</button>
-                        <button class="btn-secondary" onclick="selectFolder('pdfreplace-source')" style="margin-left:5px">选图片文件夹</button>
+                        <button class="btn-secondary" onclick="selectFolder('pdfreplace-source')" style="margin-left:5px">选来源文件夹</button>
                     </div>
                     <div class="input-group">
                         <label>来源页码:</label>
                         <input type="text" id="pdfreplace-source-pages" placeholder="留空自动匹配目标页数；也可填 1-3">
+                    </div>
+                    <div class="input-group">
+                        <label>来源文件夹:</label>
+                        <select id="pdfreplace-source-folder-mode">
+                            <option value="auto">自动判断</option>
+                            <option value="pages">作为一组替换页</option>
+                            <option value="variants">多个 PDF 分别生成</option>
+                        </select>
                     </div>
                     <div class="input-group">
                         <input type="checkbox" id="pdfreplace-auto-name">

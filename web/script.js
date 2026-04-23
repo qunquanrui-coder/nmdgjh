@@ -307,7 +307,8 @@ async function execTask(type, btnElement) {
         document.getElementById("pdfreplace-source").value,
         document.getElementById("pdfreplace-source-pages").value,
         document.getElementById("pdfreplace-recursive").checked,
-        document.getElementById("pdfreplace-auto-name").checked
+        document.getElementById("pdfreplace-auto-name").checked,
+        document.getElementById("pdfreplace-source-folder-mode").value
       );
     } else if (type === "split") {
       const val = document.getElementById("split-val").value;
