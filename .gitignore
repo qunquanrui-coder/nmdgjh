@@ -5,8 +5,10 @@ __pycache__/
 *.so
 .Python
 build/
+build_spec/
 develop-eggs/
 dist/
+QuanQuanTreasureBox_*_windows_x64.zip
 downloads/
 eggs/
 .eggs/

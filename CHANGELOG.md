@@ -1,5 +1,9 @@
 # 更新日志
 
+## v2.1.0
+
+- 新增 PDF 换页工具，支持单个 PDF、文件夹批量处理、文件名识别页码，以及图片 / 图片文件夹 / PDF 页面作为替换来源。
+
 ## v1.5
 
 - 将 Windows 打包产物从 `main.exe` 更名为 `QuanQuanTreasureBox.exe`。

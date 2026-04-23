@@ -27,6 +27,7 @@ import core_invoice
 import core_diff
 import core_ocr
 import core_pdf_cleaner
+import core_pdf_replace
 
 
 if getattr(sys, "frozen", False):

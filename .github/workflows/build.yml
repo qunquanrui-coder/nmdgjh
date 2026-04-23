@@ -53,7 +53,7 @@ jobs:
           if ("${{ github.ref }}".StartsWith("refs/tags/v")) {
             $version = $refName.TrimStart("v")
           } else {
-            $version = "1.5.${{ github.run_number }}"
+            $version = "2.1.${{ github.run_number }}"
           }
 
           "APP_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Encoding utf8 -Append

@@ -6,6 +6,7 @@ const TASK_LABELS = {
   p2w: "PDF 提取 Word",
   rmblank: "Word 空白页清理",
   pdfclean: "扫描件去黑边",
+  pdfreplace: "PDF 换页",
   split: "PDF 精准拆分",
   wsplit: "Word 目录拆解",
   wmerge: "Word 批量合并",
@@ -133,6 +134,7 @@ function switchView(viewId, element) {
     dashboard: ["运行概览", "百宝箱状态与近期活动"],
     rmblank: ["Word 空白页清理", "识别并清理文档中的空白页面"],
     pdfclean: ["扫描件去黑边", "基于 OpenCV 智能识别并遮盖扫描仪产生的黑边"],
+    pdfreplace: ["PDF 换页", "指定页码后用图片、图片文件夹或 PDF 页面替换"],
     p2w: ["PDF 提取 Word", "支持可编辑与纯图双模式"],
     split: ["PDF 精准拆分", "定长、平均、全拆与范围提取"],
     wsplit: ["Word 目录拆解", "按大纲级别一键拆分为独立文档"],
@@ -297,6 +299,16 @@ async function execTask(type, btnElement) {
       res = await invoke("run_rm_blank", document.getElementById("rmblank-path").value);
     } else if (type === "pdfclean") {
       res = await invoke("run_pdf_cleaner", document.getElementById("pdfclean-path").value);
+    } else if (type === "pdfreplace") {
+      res = await invoke(
+        "run_pdf_replace",
+        document.getElementById("pdfreplace-target").value,
+        document.getElementById("pdfreplace-pages").value,
+        document.getElementById("pdfreplace-source").value,
+        document.getElementById("pdfreplace-source-pages").value,
+        document.getElementById("pdfreplace-recursive").checked,
+        document.getElementById("pdfreplace-auto-name").checked
+      );
     } else if (type === "split") {
       const val = document.getElementById("split-val").value;
       res = await invoke(
