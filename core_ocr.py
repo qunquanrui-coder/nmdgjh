@@ -6,6 +6,7 @@ import os
 import re
 import subprocess
 import sys
+import shutil
 import threading
 import time
 import uuid
@@ -39,16 +40,41 @@ def push_heartbeat_log(msg: str) -> None:
 # ---------------------------------------------------------
 # 运行环境准备
 # ---------------------------------------------------------
-if getattr(sys, "frozen", False):
-    BASE_DIR = Path(sys.executable).parent
-else:
-    BASE_DIR = Path(__file__).parent
+def _get_base_dirs() -> List[Path]:
+    """兼容源码运行、PyInstaller onedir、PyInstaller onefile。"""
+    dirs: List[Path] = []
 
-TESS_DIR = BASE_DIR / "runtime" / "Tesseract"
-GS_BIN_DIR = BASE_DIR / "Ghostscript" / "bin"
+    if getattr(sys, "frozen", False):
+        dirs.append(Path(sys.executable).parent)
+        meipass = getattr(sys, "_MEIPASS", None)
+        if meipass:
+            dirs.append(Path(meipass))
+    else:
+        dirs.append(Path(__file__).parent)
+
+    dirs.append(Path.cwd())
+
+    unique: List[Path] = []
+    seen = set()
+    for d in dirs:
+        try:
+            key = str(d.resolve())
+        except Exception:
+            key = str(d)
+        if key not in seen:
+            seen.add(key)
+            unique.append(d)
+    return unique
+
+
+BASE_DIRS = _get_base_dirs()
+BASE_DIR = BASE_DIRS[0]
 
 
 def _prepend_env_path(path_obj: Path) -> None:
+    if not path_obj or not path_obj.exists():
+        return
+
     path_str = str(path_obj)
     current = os.environ.get("PATH", "")
     parts = current.split(os.pathsep) if current else []
@@ -56,9 +82,132 @@ def _prepend_env_path(path_obj: Path) -> None:
         os.environ["PATH"] = path_str + (os.pathsep + current if current else "")
 
 
+def _find_existing_dir(candidates: List[Path]) -> Path:
+    for p in candidates:
+        if p.exists() and p.is_dir():
+            return p
+    return candidates[0]
+
+
+def _find_tesseract_dir() -> Path:
+    candidates: List[Path] = []
+    for base in BASE_DIRS:
+        candidates.extend([
+            base / "runtime" / "Tesseract",
+            base / "runtime" / "Tesseract" / "bin",
+            base / "Tesseract",
+            base / "Tesseract" / "bin",
+        ])
+
+    exe_names = ["tesseract.exe", "tesseract"]
+    for p in candidates:
+        if p.exists() and p.is_dir():
+            if any((p / exe).exists() for exe in exe_names):
+                return p
+
+    return candidates[0]
+
+
+def _find_tessdata_dir(tess_dir: Path) -> Path:
+    candidates: List[Path] = []
+    for base in BASE_DIRS:
+        candidates.extend([
+            base / "runtime" / "Tesseract" / "tessdata",
+            base / "runtime" / "Tesseract" / "share" / "tessdata",
+            base / "runtime" / "tessdata",
+            base / "Tesseract" / "tessdata",
+            base / "Tesseract" / "share" / "tessdata",
+        ])
+
+    candidates.extend([
+        tess_dir / "tessdata",
+        tess_dir.parent / "tessdata",
+        tess_dir / "share" / "tessdata",
+        tess_dir.parent / "share" / "tessdata",
+    ])
+
+    for p in candidates:
+        if p.exists() and p.is_dir():
+            if (p / "chi_sim.traineddata").exists() or (p / "eng.traineddata").exists():
+                return p
+
+    # 兜底：在 runtime/Tesseract 下递归找 tessdata，避免打包目录层级变化导致失效。
+    for base in BASE_DIRS:
+        for root in [base / "runtime" / "Tesseract", base / "runtime", base / "Tesseract"]:
+            if not root.exists() or not root.is_dir():
+                continue
+            try:
+                for p in root.rglob("tessdata"):
+                    if p.is_dir() and (
+                        (p / "chi_sim.traineddata").exists() or (p / "eng.traineddata").exists()
+                    ):
+                        return p
+            except Exception:
+                pass
+
+    return candidates[0]
+
+
+def _is_ascii_path(path_obj: Path) -> bool:
+    try:
+        str(path_obj).encode("ascii")
+        return True
+    except UnicodeEncodeError:
+        return False
+
+
+def _public_ascii_tessdata_cache() -> Path:
+    # 使用固定英文路径，避免 Tesseract/MinGW 在中文目录下误报 tessdata 不存在。
+    return Path(r"C:\Users\Public\QuanQuanTreasureBox\tessdata")
+
+
+def _copy_tessdata_tree(src: Path, dst: Path) -> bool:
+    try:
+        if not src.exists() or not src.is_dir():
+            return False
+        dst.mkdir(parents=True, exist_ok=True)
+
+        # 复制整个 tessdata 目录，包括 traineddata、configs、tessconfigs。
+        for item in src.iterdir():
+            target = dst / item.name
+            if item.is_dir():
+                shutil.copytree(item, target, dirs_exist_ok=True)
+            elif item.is_file():
+                # 只在源文件更新或目标不存在时复制，避免每次启动都重写 70MB+ 语言包。
+                if (not target.exists()) or item.stat().st_mtime > target.stat().st_mtime or item.stat().st_size != target.stat().st_size:
+                    shutil.copy2(item, target)
+        return (dst / "chi_sim.traineddata").exists() and (dst / "eng.traineddata").exists()
+    except Exception:
+        return False
+
+
+def _prepare_tessdata_for_tesseract(src: Path) -> Path:
+    """
+    Windows 版 Tesseract/MinGW 在某些环境下无法可靠读取中文路径，
+    会出现“目录实际存在但 TESSDATA_PREFIX 报不存在”的问题。
+    这里把 tessdata 缓存到固定英文目录，再把 TESSDATA_PREFIX 指向该目录。
+    """
+    if sys.platform == "win32" and src.exists() and src.is_dir():
+        cache = _public_ascii_tessdata_cache()
+        if _copy_tessdata_tree(src, cache):
+            return cache
+    return src
+
+
+TESS_DIR = _find_tesseract_dir()
+TESSDATA_SOURCE_DIR = _find_tessdata_dir(TESS_DIR)
+TESSDATA_DIR = _prepare_tessdata_for_tesseract(TESSDATA_SOURCE_DIR)
+GS_BIN_DIR = _find_existing_dir([base / "Ghostscript" / "bin" for base in BASE_DIRS])
+
 _prepend_env_path(TESS_DIR)
+_prepend_env_path(TESS_DIR / "bin")
 _prepend_env_path(GS_BIN_DIR)
-os.environ["TESSDATA_PREFIX"] = str(TESS_DIR / "tessdata")
+
+# 只有找到真实 tessdata 目录时才设置，避免把不存在的路径写入环境变量导致 Tesseract 直接失败。
+if TESSDATA_DIR.exists() and TESSDATA_DIR.is_dir():
+    os.environ["TESSDATA_PREFIX"] = str(TESSDATA_DIR)
+else:
+    os.environ.pop("TESSDATA_PREFIX", None)
 
 import ocrmypdf
 
@@ -206,9 +355,30 @@ def _run_single_ocr(path: Path, safe_threads: int) -> Dict[str, Any]:
     keep_tmp = False
 
     try:
+        if not TESSDATA_DIR.exists() or not TESSDATA_DIR.is_dir():
+            msg = (
+                "OCR 运行库缺少 tessdata 语言包目录。请确认打包目录中存在 "
+                "runtime\\Tesseract\\tessdata，并且里面至少包含 chi_sim.traineddata 和 eng.traineddata。"
+            )
+            push_heartbeat_log(f"❌ [{path.name}] {msg}")
+            return {"status": "error", "msg": msg, "data": None}
+
+        if not (TESSDATA_DIR / "chi_sim.traineddata").exists():
+            msg = f"OCR 运行库缺少中文语言包: {TESSDATA_DIR / 'chi_sim.traineddata'}"
+            push_heartbeat_log(f"❌ [{path.name}] {msg}")
+            return {"status": "error", "msg": msg, "data": None}
+
+        if not (TESSDATA_DIR / "eng.traineddata").exists():
+            msg = f"OCR 运行库缺少英文语言包: {TESSDATA_DIR / 'eng.traineddata'}"
+            push_heartbeat_log(f"❌ [{path.name}] {msg}")
+            return {"status": "error", "msg": msg, "data": None}
+
         push_heartbeat_log(
             f"▶ 启动引擎: {path.name} (分配 {safe_threads} 个线程以保障系统平稳)"
         )
+        push_heartbeat_log(f"[*] Tesseract: {TESS_DIR}")
+        push_heartbeat_log(f"[*] Tessdata source: {TESSDATA_SOURCE_DIR}")
+        push_heartbeat_log(f"[*] Tessdata runtime: {TESSDATA_DIR}")
 
         sys.stderr = progress_stream
         hb_thread.start()
