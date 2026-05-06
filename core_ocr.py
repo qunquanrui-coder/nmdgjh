@@ -220,7 +220,7 @@ def _run_single_ocr(path: Path, safe_threads: int) -> Dict[str, Any]:
                 language=["chi_sim", "eng"],
                 force_ocr=True,
                 output_type="pdf",
-                threads=safe_threads,
+                jobs=safe_threads,
                 optimize=1,
                 fast_web_view=999,
                 skip_big=15,
