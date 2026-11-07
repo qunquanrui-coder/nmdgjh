@@ -4,6 +4,7 @@ from pathlib import Path
 from docx import Document
 from docx.shared import Mm
 from docx.enum.text import WD_ALIGN_PARAGRAPH
+from safe_output import publish_output
 
 def _convert_image_mode(pdf_path, docx_path, dpi, progress_callback):
     """纯图模式固化逻辑"""
@@ -90,48 +91,51 @@ def run_pdf2word(path_str, mode, dpi):
 
         # 2. 开始逐个转换
         for idx, f in enumerate(valid_files, 1):
-            out = f.with_suffix(".docx")
-            if out.exists():
-                out = f.with_name(f"{f.stem}_转换_{int(time.time())}{out.suffix}")
+            desired_out = f.with_suffix(".docx")
             
             bridge.update_terminal(f"[*] 正在转换 ({idx}/{len(valid_files)}): {f.name}")
             time.sleep(0.1) # ✨ 核心修复：原生线程必须使用 time.sleep 避开协程冲突
             
-            res_container = {'status': 'pending', 'msg': ''}
-            
-            # 3. 将高负载任务挂入独立线程
-            if mode == "editable":
-                bridge.update_terminal(f"  └─ 正在深度分析排版 (若文件超大可能需要几分钟，请耐心等待)...")
-                t = threading.Thread(target=_run_editable_mode, args=(f, out, res_container))
-            else:
-                t = threading.Thread(target=_run_image_mode, args=(f, out, dpi, res_container))
-            
-            t.start()
-            
-            # 4. 看门狗心跳循环：让前端 WebSocket 保持存活，并实时打印日志
-            started_at = time.time()
-            last_heartbeat = 0.0
-            last_msg = ""
-            while t.is_alive():
-                time.sleep(0.5) # keep the native worker thread responsive
-                curr_msg = res_container.get('msg', '')
-                if curr_msg and curr_msg != last_msg:
-                    bridge.update_terminal(curr_msg)
-                    last_msg = curr_msg
-
-                now = time.time()
-                if now - last_heartbeat >= 5:
-                    elapsed = int(now - started_at)
-                    if mode == "editable":
-                        stage = "editable conversion layout analysis"
-                    else:
-                        stage = curr_msg or "image conversion"
-                    bridge.update_terminal(f"HB [{f.name}] {stage} still running, elapsed {elapsed}s")
-                    last_heartbeat = now
-            
-            if res_container.get('status') == 'error':
-                raise RuntimeError(res_container.get('error'))
+            with tempfile.TemporaryDirectory(prefix=".pdf2word_", dir=str(f.parent)) as tmp_dir:
+                tmp_out = Path(tmp_dir) / desired_out.name
+                res_container = {'status': 'pending', 'msg': ''}
                 
+                # 3. 将高负载任务挂入独立线程
+                if mode == "editable":
+                    bridge.update_terminal("  └─ 正在深度分析排版 (若文件超大可能需要几分钟，请耐心等待)...")
+                    t = threading.Thread(target=_run_editable_mode, args=(f, tmp_out, res_container))
+                else:
+                    t = threading.Thread(target=_run_image_mode, args=(f, tmp_out, dpi, res_container))
+                
+                t.start()
+                
+                # 4. 看门狗心跳循环：让前端 WebSocket 保持存活，并实时打印日志
+                started_at = time.time()
+                last_heartbeat = 0.0
+                last_msg = ""
+                while t.is_alive():
+                    time.sleep(0.5) # keep the native worker thread responsive
+                    curr_msg = res_container.get('msg', '')
+                    if curr_msg and curr_msg != last_msg:
+                        bridge.update_terminal(curr_msg)
+                        last_msg = curr_msg
+
+                    now = time.time()
+                    if now - last_heartbeat >= 5:
+                        elapsed = int(now - started_at)
+                        if mode == "editable":
+                            stage = "可编辑转换排版分析"
+                        else:
+                            stage = curr_msg or "纯图模式转换"
+                        bridge.update_terminal(f"⏳ [{f.name}] {stage} 进行中，已耗时 {elapsed}s")
+                        last_heartbeat = now
+                
+                if res_container.get('status') == 'error':
+                    raise RuntimeError(res_container.get('error'))
+                if not tmp_out.exists():
+                    raise RuntimeError(f"{f.name} 转换未生成有效输出文件")
+                    
+                out = publish_output(tmp_out, desired_out)
             bridge.update_terminal(f"  └─ ✅ 成功保存至同目录: {out.name}")
 
         return {"status": "success", "msg": f"共计 {len(valid_files)} 个文件转换完毕！"}

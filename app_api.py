@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import gc
+import logging
 import threading
 import traceback
 import tkinter as tk
@@ -10,6 +11,8 @@ from tkinter import filedialog
 
 import pythoncom
 import bridge
+
+_logger = logging.getLogger("app_api")
 
 
 @bridge.expose
@@ -93,6 +96,7 @@ class AppApi:
             return func(*args, **kwargs)
 
         except Exception as e:
+            _logger.exception("Raw API task %s failed: %s", func_name, e)
             traceback.print_exc()
             return ""
 
@@ -124,14 +128,18 @@ class AppApi:
         com_initialized = False
 
         try:
+            _logger.info("Starting API task: %s", func_name)
             if need_com:
                 pythoncom.CoInitialize()
                 com_initialized = True
 
             result = func(*args, **kwargs)
-            return AppApi._normalize_result(result)
+            normalized = AppApi._normalize_result(result)
+            _logger.info("Finished API task: %s -> status=%s msg=%s", func_name, normalized.get("status"), normalized.get("msg"))
+            return normalized
 
         except Exception as e:
+            _logger.exception("API task %s raised exception: %s", func_name, e)
             traceback.print_exc()
             return {
                 "status": "error",

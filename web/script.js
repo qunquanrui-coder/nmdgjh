@@ -119,6 +119,9 @@ function update_terminal(msg, notificationType) {
   const div = document.createElement("div");
   div.innerText = `[${new Date().toLocaleTimeString()}] ${msg}`;
   term.appendChild(div);
+  while (term.childElementCount > 1000) {
+    term.removeChild(term.firstElementChild);
+  }
   term.scrollTop = term.scrollHeight;
 
   if (notificationType) {
@@ -183,6 +186,20 @@ function openDashboardTool(viewId) {
   switchView(viewId, navItem);
 }
 
+function toggleSplitInputs() {
+  const mode = document.getElementById("split-mode")?.value;
+  const valWrap = document.getElementById("split-val-wrap");
+  const rangeWrap = document.getElementById("split-range-wrap");
+  if (!valWrap || !rangeWrap) return;
+  if (mode === "extract") {
+    valWrap.style.display = "none";
+    rangeWrap.style.display = "inline-flex";
+  } else {
+    valWrap.style.display = "inline-flex";
+    rangeWrap.style.display = "none";
+  }
+}
+
 /**
  * 4. 基础文件/文件夹选择联动
  */
@@ -196,7 +213,7 @@ async function selectFile(id) {
 
     if (p && typeof p === "string") {
       document.getElementById(id).value = p;
-      showToast(`已选择: ${p.split("\\").pop()}`, "info");
+      showToast(`已选择: ${p.split(/[\\/]/).pop()}`, "info");
     }
   } catch (err) {
     console.error(err);
@@ -214,7 +231,7 @@ async function selectFolder(id) {
 
     if (p && typeof p === "string") {
       document.getElementById(id).value = p;
-      showToast(`已选择目录: ${p.split("\\").pop()}`, "info");
+      showToast(`已选择目录: ${p.split(/[\\/]/).pop()}`, "info");
     }
   } catch (err) {
     console.error(err);
@@ -237,7 +254,10 @@ async function selectWordFileForSplit(id) {
 
     document.getElementById(id).value = p;
 
-    const linkage = await invoke("handle_file_selection", p);
+    let linkage = await invoke("handle_file_selection", p);
+    if (linkage && linkage.data) {
+      linkage = linkage.data;
+    }
     if (linkage && linkage.out_dir) {
       document.getElementById("wsplit-out").value = linkage.out_dir;
     }
@@ -253,7 +273,10 @@ async function selectWordFileForSplit(id) {
       levelCb.innerHTML = "<option>分析中...</option>";
     }
 
-    const scanRes = await invoke("get_word_outline", p);
+    let scanRes = await invoke("get_word_outline", p);
+    if (scanRes && scanRes.data && scanRes.data.options) {
+      scanRes = scanRes.data;
+    }
 
     if (scanRes && scanRes.options && scanRes.options.length > 0) {
       levelCb.innerHTML = "";
@@ -339,14 +362,16 @@ async function execTask(type, btnElement) {
       );
     } else if (type === "split") {
       const val = document.getElementById("split-val").value;
+      const startPage = document.getElementById("split-start")?.value || 1;
+      const endPage = document.getElementById("split-end")?.value || 1;
       res = await invoke(
         "run_split",
         document.getElementById("split-path").value,
         document.getElementById("split-mode").value,
         val,
         val,
-        1,
-        1
+        startPage,
+        endPage
       );
     } else if (type === "wsplit") {
       res = await invoke(
@@ -448,4 +473,5 @@ document.addEventListener("DOMContentLoaded", () => {
   if (defaultNav) {
     switchView("dashboard", defaultNav);
   }
+  toggleSplitInputs();
 });

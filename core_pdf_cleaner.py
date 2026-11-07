@@ -21,7 +21,7 @@ def run_pdf_cleaner(path_str: str):
             pdf_files = [target_path]
             output_dir = target_path.parent
         elif target_path.is_dir():
-            pdf_files = list(target_path.glob("*.pdf"))
+            pdf_files = [p for p in target_path.glob("*.pdf") if p.is_file() and not p.name.startswith("~$")]
             output_dir = target_path / "已去边"
             if pdf_files and not output_dir.exists():
                 output_dir.mkdir()

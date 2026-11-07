@@ -1,5 +1,19 @@
 # 更新日志
 
+## v2.1.6
+
+- **日志体系补齐**：新增 `logs/app.log` 结构化运行日志记录，`bridge.update_terminal` 与 `app_api` 任务执行全链路自动落盘；`crash_log.txt` 改为带时间戳追加模式，避免覆盖历史崩溃现场。
+- **前端与后端能力对齐**：
+  - `PDF 精准拆分` 页面补齐“范围提取（起始页 / 结束页）”模式入口。
+  - `PDF 提取 Word` 与 `PDF 权限解密` 页面补齐“选文件夹”批量处理按钮。
+  - 前端终端日志面板增加最大行数（1000 条）滚动裁剪保护，防止超大批量任务导致 DOM 卡顿。
+- **文件与资源安全加固**：
+  - `core_split.py`：修复 `mmap` 句柄与打开文件未关闭导致的 Windows 文件锁泄漏，将弃用的 `tempfile.mktemp` 替换为安全的 `tempfile.mkstemp`。
+  - `core_pdf2word.py` / `core_pdf_replace.py` / `core_word_split.py`：统一接入 `safe_output`（`publish_output` / `new_output_directory`），避免中途异常留下残缺文件或同名覆盖已有结果。
+  - `core_diff.py` / `core_invoice.py`：显式关闭 `openpyxl` 工作簿句柄；对旧版 `.xls` 差异比对给出明确转换提示，并统一中文化心跳日志。
+  - `core_compress.py`：增加空路径、非文件及非正数目标大小参数校验。
+  - `build_modern.py`：显式加入 `--hidden-import=safe_output` 打包声明。
+
 ## v2.1.5
 
 - 拒绝空文件或文件夹路径，防止误处理程序目录中的文件。

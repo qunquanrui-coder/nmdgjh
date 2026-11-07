@@ -1,6 +1,7 @@
 import tempfile
 import unittest
 from pathlib import Path
+from unittest.mock import patch
 
 import fitz
 from PIL import Image
@@ -38,6 +39,33 @@ class PDFExportTests(unittest.TestCase):
                 self.assertEqual(len(doc), 2)
             with fitz.open(new_dir / "source_Part2_P3-3.pdf") as doc:
                 self.assertIn("Page 3", doc[0].get_text())
+
+    def test_split_extract_mode_and_mmap_cleanup(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            source = root / "source.pdf"
+            write_pdf(source, 4)
+
+            real_open = fitz.open
+            calls = []
+
+            def fail_first_direct_open(*args, **kwargs):
+                calls.append((args, kwargs))
+                if len(calls) == 1 and "stream" not in kwargs:
+                    raise RuntimeError("force mmap fallback")
+                return real_open(*args, **kwargs)
+
+            with patch.object(core_split.fitz, "open", side_effect=fail_first_direct_open):
+                result = core_split.run_split(source, "extract", 1, 1, 2, 3)
+
+            self.assertEqual(result["status"], "success", result)
+            out_file = root / "source_extract" / "source_Part1_P2-3.pdf"
+            with fitz.open(out_file) as doc:
+                self.assertEqual(len(doc), 2)
+                self.assertIn("Page 2", doc[0].get_text())
+            # Verify source file is not locked on Windows after mmap fallback
+            source.unlink()
+            self.assertFalse(source.exists())
 
     def test_image_export_uses_separate_directory_without_stale_pages(self):
         with tempfile.TemporaryDirectory() as tmp:

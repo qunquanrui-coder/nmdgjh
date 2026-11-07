@@ -4,8 +4,10 @@ import unittest
 from pathlib import Path
 from unittest import mock
 
+import fitz
 import core_img2pdf
 import core_ocr
+import core_pdf2word
 import core_word2pdf
 import safe_output
 from PIL import Image
@@ -64,6 +66,21 @@ class OutputSafetyTests(unittest.TestCase):
             self.assertEqual(result["status"], "success")
             self.assertEqual(old.read_bytes(), b"old")
             self.assertTrue((folder / (folder.name + " (1).pdf")).read_bytes().startswith(b"%PDF"))
+
+    def test_pdf2word_preserves_existing_docx_and_cleans_temp_on_failure(self):
+        with tempfile.TemporaryDirectory() as directory:
+            folder = Path(directory)
+            source = folder / "sample.pdf"
+            with fitz.open() as doc:
+                doc.new_page().insert_text((36, 36), "Hello")
+                doc.save(source)
+            existing = folder / "sample.docx"
+            existing.write_bytes(b"existing docx")
+
+            res = core_pdf2word.run_pdf2word(str(source), "image", 72)
+            self.assertEqual(res["status"], "success", res)
+            self.assertEqual(existing.read_bytes(), b"existing docx")
+            self.assertTrue((folder / "sample (1).docx").exists())
 
     def test_ocr_preserves_existing_output(self):
         with tempfile.TemporaryDirectory() as directory:

@@ -13,6 +13,7 @@ import pythoncom
 import win32com.client as win32
 from pathlib import Path
 from typing import Dict, Any, List, Optional
+from safe_output import new_output_directory
 
 try:
     from docx import Document as DocxDocument
@@ -118,7 +119,7 @@ class WordSplitterEngine:
                 gc.collect()
                 if word:
                     try: word.Quit(0)
-                    except: pass
+                    except Exception: pass
                 pythoncom.CoUninitialize()
                 
         return level_counts
@@ -156,12 +157,12 @@ class WordSplitterEngine:
                         if clean_text and rng.Start not in all_headings_dict:
                             # 避开可能导致异常的表格区域
                             try: in_tbl = rng.Information(12)
-                            except: in_tbl = False
+                            except Exception: in_tbl = False
                             
                             if not in_tbl:
                                 para = rng.Paragraphs(1)
                                 all_headings_dict[rng.Start] = {'start': rng.Start, 'level': lvl, 'para': para}
-                    except: pass
+                    except Exception: pass
                     rng.Collapse(0)
 
             all_headings = [all_headings_dict[k] for k in sorted(all_headings_dict.keys())]
@@ -182,8 +183,9 @@ class WordSplitterEngine:
                 res_container['error'] = f"未在文档中找到级别为 {target_level} 的有效大纲标题。"
                 return
 
-            out_path = out_dir.resolve()
-            out_path.mkdir(parents=True, exist_ok=True)
+            out_dir.parent.mkdir(parents=True, exist_ok=True)
+            out_path = new_output_directory(out_dir.resolve())
+            res_container['out_dir'] = out_path.name
 
             for idx, node in enumerate(target_nodes):
                 if self._stop_event.is_set():
@@ -238,8 +240,10 @@ class WordSplitterEngine:
                             pass
 
                         final_file = out_path / f"{safe_name}.docx"
-                        if final_file.exists():
-                            final_file = out_path / f"{safe_name}_{int(time.time())}.docx"
+                        dup_idx = 1
+                        while final_file.exists():
+                            final_file = out_path / f"{safe_name} ({dup_idx}).docx"
+                            dup_idx += 1
 
                         new_doc.SaveAs2(str(final_file), 16)
                         new_doc.Close(0)
@@ -267,6 +271,7 @@ class WordSplitterEngine:
                     gc.collect()
 
             res_container['status'] = 'ok'
+            res_container['total'] = total
 
         except Exception as e:
             res_container['status'] = 'error'
@@ -300,6 +305,8 @@ def handle_file_selection(path_str: str) -> Dict[str, str]:
 @bridge.expose
 def get_word_outline(doc_path: str) -> Dict[str, Any]:
     try:
+        if not str(doc_path or "").strip():
+            return {"status": "error", "status_text": "⚠️ 请先选择有效的 Word 文件", "options": []}
         counts = _engine.scan_outline(Path(doc_path))
         if not counts:
             return {"recommended": None, "status_text": "❌ 未发现有效大纲(检查格式)", "options": ["无可用级别"]}
@@ -315,17 +322,17 @@ def get_word_outline(doc_path: str) -> Dict[str, Any]:
             "status": "success"
         }
     except Exception as e:
-        return {"status": "error", "status_text": f"⚠️ 分析出错", "options": []}
+        return {"status": "error", "status_text": "⚠️ 分析出错", "options": []}
 
 
 @bridge.expose
 def run_word_split(doc_path: str, out_dir: str, target_level_str: str, recommended_lvl: int) -> Dict[str, Any]:
     if not str(doc_path or "").strip() or not str(out_dir or "").strip():
         return {"status": "error", "msg": "请重新选择要拆分的 Word 文件"}
-    if "推荐" in target_level_str or not any(char.isdigit() for char in target_level_str):
-        target = int(recommended_lvl)
+    if "推荐" in str(target_level_str or "") or not any(char.isdigit() for char in str(target_level_str or "")):
+        target = int(recommended_lvl) if recommended_lvl else 1
     else:
-        match = re.search(r'\d+', target_level_str)
+        match = re.search(r'\d+', str(target_level_str))
         target = int(match.group()) if match else 1
 
     try:
@@ -346,6 +353,8 @@ def run_word_split(doc_path: str, out_dir: str, target_level_str: str, recommend
         if res_container.get('status') == 'error':
             raise RuntimeError(res_container.get('error'))
 
-        return {"status": "success"}
+        saved_dir = res_container.get('out_dir', f"按级别{target}拆分")
+        total_cnt = res_container.get('total', 0)
+        return {"status": "success", "msg": f"共拆解 {total_cnt} 个文档，保存至: {saved_dir}"}
     except Exception as e:
         return {"status": "error", "msg": str(e)}

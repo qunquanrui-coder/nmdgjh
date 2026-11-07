@@ -3,8 +3,11 @@
 from __future__ import annotations
 
 import json
+import logging
 import threading
 from typing import Any, Callable, Dict, Optional
+
+_logger = logging.getLogger("bridge")
 
 _exposed_functions: Dict[str, Callable[..., Any]] = {}
 
@@ -60,4 +63,8 @@ def call_frontend(function_name: str, *args: Any):
 
 
 def update_terminal(message: str):
+    try:
+        _logger.info(message)
+    except Exception:
+        pass
     return call_frontend("update_terminal", message)

@@ -217,12 +217,21 @@ def choose_best_candidate(candidates, target_b: int, floor_ratio: float):
 @bridge.expose
 def run_compress(path_str, target_size, unit):
     try:
-        original_input = Path(path_str.strip()).resolve()
-        if not original_input.exists():
+        if not str(path_str or "").strip():
+            return {"status": "error", "msg": "请选择要压缩的 PDF 或 Word 文件。"}
+        original_input = Path(str(path_str).strip()).resolve()
+        if not original_input.is_file():
             return {"status": "error", "msg": "文件不存在。"}
 
+        try:
+            target_val = float(target_size)
+        except (TypeError, ValueError):
+            return {"status": "error", "msg": "目标大小必须是有效数字。"}
+        if target_val <= 0:
+            return {"status": "error", "msg": "目标大小必须大于 0。"}
+
         in_p = original_input
-        target_b = float(target_size) * (1024 if unit == "KB" else 1024 * 1024)
+        target_b = target_val * (1024 if unit == "KB" else 1024 * 1024)
         ext = in_p.suffix.lower()
         fmt_sz = fmt_size_factory(unit)
 

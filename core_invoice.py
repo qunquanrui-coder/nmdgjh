@@ -164,7 +164,7 @@ def get_info_strict_code(full_text: str):
         try:
             f = float(n.replace(",", ""))
             if 0.01 <= abs(f) < 10000000000: all_nums.append(f)
-        except: continue
+        except Exception: continue
     floats = sorted((abs(n) for n in all_nums), reverse=True)
 
     # A missing tax rate is unknown, not evidence of the 1% rate.
@@ -187,7 +187,7 @@ def get_info_strict_code(full_text: str):
     total_match = re.search(r"(?:价税合计|小写)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if total_match:
         try: total_val = float(total_match.group(1).replace(",", ""))
-        except: pass
+        except Exception: pass
     if total_match is None and all_nums: total_val = max(all_nums, key=abs)
 
     # Perform the existing positive-amount inference on absolute values and
@@ -199,11 +199,11 @@ def get_info_strict_code(full_text: str):
     tax_match = re.search(r"(?:合计税额|税额)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if tax_match:
         try: tax_val = float(tax_match.group(1).replace(",", ""))
-        except: pass
+        except Exception: pass
     amt_match = re.search(r"(?:不含税金额|合计金额|金额)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if amt_match:
         try: pre_tax_val = float(amt_match.group(1).replace(",", ""))
-        except: pass
+        except Exception: pass
 
     # Keep explicitly extracted signs; inconsistent signs must not be silently
     # converted into a plausible but fabricated positive invoice.
@@ -294,35 +294,38 @@ def extract_text_from_pdf(file_path: str, progress_callback=None) -> str:
 def save_excel_formatted(df: pd.DataFrame, output_file: str):
     df.to_excel(output_file, index=False)
     wb = load_workbook(output_file)
-    ws = wb.active
-    ws.title = "汇总"
-    ws.freeze_panes = "A2"
-    ws.auto_filter.ref = f"A1:G{ws.max_row}"
+    try:
+        ws = wb.active
+        ws.title = "汇总"
+        ws.freeze_panes = "A2"
+        ws.auto_filter.ref = f"A1:G{ws.max_row}"
 
-    for col, w in {"A": 16, "B": 26, "C": 16, "D": 8, "E": 16, "F": 12, "G": 14}.items():
-        ws.column_dimensions[col].width = w
+        for col, w in {"A": 16, "B": 26, "C": 16, "D": 8, "E": 16, "F": 12, "G": 14}.items():
+            ws.column_dimensions[col].width = w
 
-    header_font = Font(name="微软雅黑", bold=True, size=12)
-    body_font = Font(name="微软雅黑", size=11)
-    center = Alignment(horizontal="center", vertical="center")
-    right = Alignment(horizontal="right", vertical="center")
-    border = Border(left=Side(style="thin", color="999999"), right=Side(style="thin", color="999999"), 
-                    top=Side(style="thin", color="999999"), bottom=Side(style="thin", color="999999"))
+        header_font = Font(name="微软雅黑", bold=True, size=12)
+        body_font = Font(name="微软雅黑", size=11)
+        center = Alignment(horizontal="center", vertical="center")
+        right = Alignment(horizontal="right", vertical="center")
+        border = Border(left=Side(style="thin", color="999999"), right=Side(style="thin", color="999999"), 
+                        top=Side(style="thin", color="999999"), bottom=Side(style="thin", color="999999"))
 
-    ws.row_dimensions[1].height = 22
-    for cell in ws[1]:
-        cell.font = header_font; cell.alignment = center; cell.border = border
+        ws.row_dimensions[1].height = 22
+        for cell in ws[1]:
+            cell.font = header_font; cell.alignment = center; cell.border = border
 
-    for r in range(2, ws.max_row + 1):
-        ws.row_dimensions[r].height = 20
-        ws[f"A{r}"].number_format = "@"; ws[f"B{r}"].number_format = "@"; ws[f"C{r}"].number_format = 'yyyy"年"mm"月"dd"日"'
-        ws[f"D{r}"].number_format = "0%"
-        for col in ["E", "F", "G"]: ws[f"{col}{r}"].number_format = "#,##0.00"
-        for col in ["A", "B", "C", "D", "E", "F", "G"]:
-            cell = ws[f"{col}{r}"]
-            cell.font = body_font; cell.border = border
-            cell.alignment = right if col in ["E", "F", "G"] else center
-    wb.save(output_file)
+        for r in range(2, ws.max_row + 1):
+            ws.row_dimensions[r].height = 20
+            ws[f"A{r}"].number_format = "@"; ws[f"B{r}"].number_format = "@"; ws[f"C{r}"].number_format = 'yyyy"年"mm"月"dd"日"'
+            ws[f"D{r}"].number_format = "0%"
+            for col in ["E", "F", "G"]: ws[f"{col}{r}"].number_format = "#,##0.00"
+            for col in ["A", "B", "C", "D", "E", "F", "G"]:
+                cell = ws[f"{col}{r}"]
+                cell.font = body_font; cell.border = border
+                cell.alignment = right if col in ["E", "F", "G"] else center
+        wb.save(output_file)
+    finally:
+        wb.close()
 
 @bridge.expose
 def run_invoice(path, recursive):
@@ -330,8 +333,10 @@ def run_invoice(path, recursive):
         if not str(path or "").strip():
             return {"status": "error", "msg": "请选择存放发票的文件夹"}
         folder = Path(path).resolve()
+        if not folder.is_dir():
+            return {"status": "error", "msg": "请选择有效的发票文件夹"}
         files = list(folder.rglob("*.*") if recursive else folder.iterdir())
-        valid = [f for f in files if f.suffix.lower() in (".pdf",".jpg",".png",".jpeg",".bmp") and not f.name.startswith("~$")]
+        valid = [f for f in files if f.is_file() and f.suffix.lower() in (".pdf",".jpg",".png",".jpeg",".bmp") and not f.name.startswith("~$")]
         
         data_list, error_list, seen_invoices = [], [], {}
         for idx, f in enumerate(valid, 1):

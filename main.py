@@ -3,8 +3,10 @@
 import os
 import sys
 import gc
+import logging
 import traceback
 import multiprocessing
+from datetime import datetime
 from pathlib import Path
 
 import webview
@@ -37,12 +39,37 @@ else:
 
 WEB_DIR = BASE_DIR / "web"
 INDEX_FILE = WEB_DIR / "index.html"
+LOG_DIR = BASE_DIR / "logs"
+LOG_FILE = LOG_DIR / "app.log"
+
+
+def setup_logging() -> None:
+    try:
+        LOG_DIR.mkdir(parents=True, exist_ok=True)
+        root_logger = logging.getLogger()
+        if not root_logger.handlers:
+            root_logger.setLevel(logging.INFO)
+            fmt = logging.Formatter(
+                "%(asctime)s [%(levelname)s] [%(name)s] %(message)s",
+                datefmt="%Y-%m-%d %H:%M:%S",
+            )
+            fh = logging.FileHandler(LOG_FILE, encoding="utf-8")
+            fh.setFormatter(fmt)
+            root_logger.addHandler(fh)
+    except Exception:
+        pass
+
+
+setup_logging()
 
 
 def log_exception(exc_type, exc_value, exc_traceback):
     try:
-        with open(BASE_DIR / "crash_log.txt", "w", encoding="utf-8") as f:
-            f.write("".join(traceback.format_exception(exc_type, exc_value, exc_traceback)))
+        err_text = "".join(traceback.format_exception(exc_type, exc_value, exc_traceback))
+        logging.critical("Uncaught exception:\n%s", err_text)
+        with open(BASE_DIR / "crash_log.txt", "a", encoding="utf-8") as f:
+            f.write(f"\n=== [{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}] ===\n")
+            f.write(err_text)
     except Exception:
         pass
 

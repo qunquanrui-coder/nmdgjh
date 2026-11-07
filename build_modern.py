@@ -52,7 +52,7 @@ APP_DISPLAY_NAME = "泉泉的百宝箱"
 APP_DESCRIPTION = "泉泉的百宝箱 - 本地桌面文档工具箱"
 APP_COMPANY = "qunquanrui-coder"
 APP_COPYRIGHT = "Copyright (c) 2026 qunquanrui-coder. All rights reserved."
-APP_VERSION = os.environ.get("APP_VERSION", "2.1.5")
+APP_VERSION = os.environ.get("APP_VERSION", "2.1.6")
 
 DIST_DIR = ROOT / "dist"
 BUILD_DIR = ROOT / "build"
@@ -268,6 +268,7 @@ def build_pyinstaller_command(dist_dir: Optional[Path] = None) -> list[str]:
         # 核心模块
         "--hidden-import=bridge",
         "--hidden-import=app_api",
+        "--hidden-import=safe_output",
         "--hidden-import=core_blank_page",
         "--hidden-import=core_compress",
         "--hidden-import=core_diff",

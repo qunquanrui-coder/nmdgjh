@@ -3,38 +3,64 @@ import bridge, os, re, mmap, tempfile, fitz
 from pathlib import Path
 from safe_output import new_output_directory
 try: import pypdf
-except: pypdf = None
+except Exception: pypdf = None
 try: import pikepdf
-except: pikepdf = None
+except Exception: pikepdf = None
 
 def _open_pdf_robust(path):
     # ✨ 严格还原五级强攻打开策略
     errs = []
     try: return fitz.open(path), None
     except Exception as e: errs.append(f"Direct: {e}")
+    f = None
+    mm = None
+    mv = None
     try:
         f = open(path, "rb")
         mm = mmap.mmap(f.fileno(), 0, access=mmap.ACCESS_READ)
-        doc = fitz.open(stream=memoryview(mm), filetype="pdf")
-        doc._mmap_ref = mm; doc._mmap_file = f
+        mv = memoryview(mm)
+        doc = fitz.open(stream=mv, filetype="pdf")
+        doc._mmap_mv = mv; doc._mmap_ref = mm; doc._mmap_file = f
         return doc, None
-    except Exception as e: errs.append(f"Mmap: {e}")
+    except Exception as e:
+        errs.append(f"Mmap: {e}")
+        if mv is not None:
+            try: mv.release()
+            except Exception: pass
+        if mm is not None:
+            try: mm.close()
+            except Exception: pass
+        if f is not None:
+            try: f.close()
+            except Exception: pass
     if pypdf:
+        tmp = None
         try:
             reader = pypdf.PdfReader(path, strict=False); writer = pypdf.PdfWriter()
             for p in reader.pages: writer.add_page(p)
-            tmp = tempfile.mktemp(".pdf")
-            with open(tmp, "wb") as f: writer.write(f)
+            fd, tmp = tempfile.mkstemp(prefix=".split_pypdf_", suffix=".pdf")
+            os.close(fd)
+            with open(tmp, "wb") as tf: writer.write(tf)
             doc = fitz.open(tmp); doc._tmp_path = tmp
             return doc, None
-        except Exception as e: errs.append(f"PyPDF_Rewrite: {e}")
+        except Exception as e:
+            errs.append(f"PyPDF_Rewrite: {e}")
+            if tmp and os.path.exists(tmp):
+                try: os.remove(tmp)
+                except Exception: pass
     if pikepdf:
+        tmp = None
         try:
-            tmp = tempfile.mktemp(".pdf")
+            fd, tmp = tempfile.mkstemp(prefix=".split_pikepdf_", suffix=".pdf")
+            os.close(fd)
             with pikepdf.open(path, allow_overwriting_input=True) as pdf: pdf.save(tmp)
             doc = fitz.open(tmp); doc._tmp_path = tmp
             return doc, None
-        except Exception as e: errs.append(f"PikePDF_Rewrite: {e}")
+        except Exception as e:
+            errs.append(f"PikePDF_Rewrite: {e}")
+            if tmp and os.path.exists(tmp):
+                try: os.remove(tmp)
+                except Exception: pass
     return None, " | ".join(errs)
 
 @bridge.expose
@@ -76,4 +102,15 @@ def run_split(path, mode, fixed, parts, start, end):
         return {"status": "success", "msg": f"保存至: {out_dir.name}"}
     finally:
         doc.close()
-        if hasattr(doc, "_tmp_path") and os.path.exists(doc._tmp_path): os.remove(doc._tmp_path)
+        if hasattr(doc, "_mmap_mv") and doc._mmap_mv is not None:
+            try: doc._mmap_mv.release()
+            except Exception: pass
+        if hasattr(doc, "_mmap_ref") and doc._mmap_ref is not None:
+            try: doc._mmap_ref.close()
+            except Exception: pass
+        if hasattr(doc, "_mmap_file") and doc._mmap_file is not None:
+            try: doc._mmap_file.close()
+            except Exception: pass
+        if hasattr(doc, "_tmp_path") and os.path.exists(doc._tmp_path):
+            try: os.remove(doc._tmp_path)
+            except Exception: pass

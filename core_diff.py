@@ -23,14 +23,14 @@ def _start_heartbeat(label, state, interval=5):
 
     def worker():
         while not stop_event.wait(interval):
-            stage = state.get("stage", "processing")
+            stage = state.get("stage", "处理中")
             current = state.get("current")
             total = state.get("total")
             elapsed = int(time.time() - start_time)
             if current is not None and total:
-                bridge.update_terminal(f"HB [{label}] {stage}: {current}/{total}, elapsed {elapsed}s")
+                bridge.update_terminal(f"⏳ [{label}] {stage}: {current}/{total}，已耗时 {elapsed}s")
             else:
-                bridge.update_terminal(f"HB [{label}] {stage}, elapsed {elapsed}s")
+                bridge.update_terminal(f"⏳ [{label}] {stage}，已耗时 {elapsed}s")
 
     thread = threading.Thread(target=worker, daemon=True)
     thread.start()
@@ -68,7 +68,7 @@ def _read_docx_lines(path: Path, progress=None):
                         label = f"{location}表格{table_no}第{row_no}行第{col_no}列："
                         read_blocks(cell, cell._tc, label)
             if progress and len(lines) and len(lines) % 200 == 0:
-                progress("read Word paragraphs and tables", len(lines), None)
+                progress("读取 Word 段落与表格", len(lines), None)
 
     read_blocks(d, d.element.body)
     return lines
@@ -78,14 +78,14 @@ def _diff_text(a_lines, b_lines, progress=None):
     a = [x[1] for x in a_lines]
     b = [x[1] for x in b_lines]
     if progress:
-        progress("compare paragraphs", None, None)
+        progress("比对段落差异", None, None)
     sm = difflib.SequenceMatcher(a=a, b=b)
     changes = []
     opcodes = sm.get_opcodes()
     total = len(opcodes)
     for idx, (tag, i1, i2, j1, j2) in enumerate(opcodes, 1):
         if progress and (idx % 100 == 0 or idx == total):
-            progress("scan paragraph changes", idx, total)
+            progress("扫描段落变更", idx, total)
         if tag == "equal":
             continue
         changes.append({
@@ -109,40 +109,48 @@ def _write_styled_report(out: Path, df: pd.DataFrame, is_word: bool):
         df.to_excel(w, index=False, sheet_name="差异报告")
 
     wb = load_workbook(out)
-    ws = wb["差异报告"]
-    # Source document text is data, even when it starts with '='.
-    for row in ws.iter_rows():
-        for cell in row:
-            if cell.data_type == "f":
-                cell.data_type = "s"
-    ws.freeze_panes = "A2"
+    try:
+        ws = wb["差异报告"]
+        # Source document text is data, even when it starts with '='.
+        for row in ws.iter_rows():
+            for cell in row:
+                if cell.data_type == "f":
+                    cell.data_type = "s"
+        ws.freeze_panes = "A2"
 
-    header_fill = PatternFill("solid", fgColor="1F4E79")
-    header_font = Font(color="FFFFFF", bold=True)
+        header_fill = PatternFill("solid", fgColor="1F4E79")
+        header_font = Font(color="FFFFFF", bold=True)
 
-    for c in range(1, ws.max_column + 1):
-        cell = ws.cell(1, c)
-        cell.fill = header_fill
-        cell.font = header_font
-        cell.alignment = Alignment(horizontal="center", vertical="center")
-        if is_word:
-            ws.column_dimensions[get_column_letter(c)].width = 24 if c < 4 else 60
-        else:
-            ws.column_dimensions[get_column_letter(c)].width = 18 if c <= 2 else 60
-    wb.save(out)
+        for c in range(1, ws.max_column + 1):
+            cell = ws.cell(1, c)
+            cell.fill = header_fill
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal="center", vertical="center")
+            if is_word:
+                ws.column_dimensions[get_column_letter(c)].width = 24 if c < 4 else 60
+            else:
+                ws.column_dimensions[get_column_letter(c)].width = 18 if c <= 2 else 60
+        wb.save(out)
+    finally:
+        wb.close()
 
 
 @bridge.expose
 def run_diff(a_path, b_path, strict):
-    state = {"stage": "prepare", "current": None, "total": None}
-    stop_event, heartbeat_thread = _start_heartbeat("diff", state)
+    state = {"stage": "准备比对", "current": None, "total": None}
+    stop_event, heartbeat_thread = _start_heartbeat("文档比对", state)
     try:
+        if not str(a_path or "").strip() or not str(b_path or "").strip():
+            return {"status": "error", "msg": "请选择要比对的两个文件"}
+
         def progress(stage, current=None, total=None):
             state["stage"] = stage
             state["current"] = current
             state["total"] = total
 
-        a, b = Path(a_path), Path(b_path)
+        a, b = Path(str(a_path).strip()).resolve(), Path(str(b_path).strip()).resolve()
+        if not a.is_file() or not b.is_file():
+            return {"status": "error", "msg": "所选比对文件不存在或无效"}
         if a.suffix.lower() != b.suffix.lower():
             return {"status": "error", "msg": "两个文件类型必须一致（同为 docx 或 xlsx）"}
 
@@ -151,13 +159,13 @@ def run_diff(a_path, b_path, strict):
             if docx is None:
                 return {"status": "error", "msg": "未安装 python-docx 依赖"}
             bridge.update_terminal("[*] 正在进行 Word 段落深度比对...")
-            progress(f"read {a.name}")
+            progress(f"读取 {a.name}")
             a_lines = _read_docx_lines(a, progress)
-            progress(f"read {b.name}")
+            progress(f"读取 {b.name}")
             b_lines = _read_docx_lines(b, progress)
             changes = _diff_text(a_lines, b_lines, progress)
             out = b.parent / f"{b.stem}_Word对比报告.xlsx"
-            progress("write report")
+            progress("写入对比报告")
             with tempfile.TemporaryDirectory(prefix="diff_") as tmp_dir:
                 tmp_output = Path(tmp_dir) / out.name
                 _write_styled_report(tmp_output, pd.DataFrame(changes), is_word=True)
@@ -165,40 +173,51 @@ def run_diff(a_path, b_path, strict):
             return {"status": "success", "msg": f"报告已生成: {out.name}"}
 
         elif ext in (".xlsx", ".xls"):
+            if ext == ".xls":
+                return {"status": "error", "msg": "暂不支持旧版 .xls 直接比对，请先另存为 .xlsx 格式"}
             bridge.update_terminal("[*] 正在进行 Excel 逐单元格比对...")
-            progress(f"open {a.name}")
-            wa = load_workbook(a, data_only=True)
-            progress(f"open {b.name}")
-            wb = load_workbook(b, data_only=True)
-            fa = load_workbook(a, data_only=False)
-            fb = load_workbook(b, data_only=False)
-            changes = []
-            sheets = sorted(set(wa.sheetnames) | set(wb.sheetnames))
-            for sheet_idx, s in enumerate(sheets, 1):
-                sa = wa[s] if s in wa.sheetnames else None
-                sb = wb[s] if s in wb.sheetnames else None
-                fsa = fa[s] if s in fa.sheetnames else None
-                fsb = fb[s] if s in fb.sheetnames else None
-                max_r = max(sa.max_row if sa else 1, sb.max_row if sb else 1)
-                max_c = max(sa.max_column if sa else 1, sb.max_column if sb else 1)
-                progress(f"scan sheet {s}", sheet_idx, len(sheets))
-                for r in range(1, max_r + 1):
-                    if r % 500 == 0 or r == max_r:
-                        bridge.update_terminal(f"  └─ Sheet {s}: row {r}/{max_r}")
-                    for c in range(1, max_c + 1):
-                        va = sa.cell(r, c).value if sa else None
-                        vb = sb.cell(r, c).value if sb else None
-                        if va != vb:
-                            changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r}", "Old": str(va) if va is not None else "", "New": str(vb) if vb is not None else ""})
-                        ca = fsa.cell(r, c) if fsa else None
-                        cb = fsb.cell(r, c) if fsb else None
-                        old_formula = ca.value if ca and ca.data_type == "f" else None
-                        new_formula = cb.value if cb and cb.data_type == "f" else None
-                        if old_formula != new_formula:
-                            changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r} (公式)", "Old": old_formula or "", "New": new_formula or ""})
+            wa = wb = fa = fb = None
+            try:
+                progress(f"打开 {a.name}")
+                wa = load_workbook(a, data_only=True)
+                progress(f"打开 {b.name}")
+                wb = load_workbook(b, data_only=True)
+                fa = load_workbook(a, data_only=False)
+                fb = load_workbook(b, data_only=False)
+                changes = []
+                sheets = sorted(set(wa.sheetnames) | set(wb.sheetnames))
+                for sheet_idx, s in enumerate(sheets, 1):
+                    sa = wa[s] if s in wa.sheetnames else None
+                    sb = wb[s] if s in wb.sheetnames else None
+                    fsa = fa[s] if s in fa.sheetnames else None
+                    fsb = fb[s] if s in fb.sheetnames else None
+                    max_r = max(sa.max_row if sa else 1, sb.max_row if sb else 1)
+                    max_c = max(sa.max_column if sa else 1, sb.max_column if sb else 1)
+                    progress(f"扫描工作表 {s}", sheet_idx, len(sheets))
+                    for r in range(1, max_r + 1):
+                        if r % 500 == 0 or r == max_r:
+                            bridge.update_terminal(f"  └─ Sheet {s}: 第 {r}/{max_r} 行")
+                        for c in range(1, max_c + 1):
+                            va = sa.cell(r, c).value if sa else None
+                            vb = sb.cell(r, c).value if sb else None
+                            if va != vb:
+                                changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r}", "Old": str(va) if va is not None else "", "New": str(vb) if vb is not None else ""})
+                            ca = fsa.cell(r, c) if fsa else None
+                            cb = fsb.cell(r, c) if fsb else None
+                            old_formula = ca.value if ca and ca.data_type == "f" else None
+                            new_formula = cb.value if cb and cb.data_type == "f" else None
+                            if old_formula != new_formula:
+                                changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r} (公式)", "Old": old_formula or "", "New": new_formula or ""})
+            finally:
+                for book in (wa, wb, fa, fb):
+                    if book is not None:
+                        try:
+                            book.close()
+                        except Exception:
+                            pass
 
             out = b.parent / f"{b.stem}_Excel对比报告.xlsx"
-            progress("write report")
+            progress("写入对比报告")
             with tempfile.TemporaryDirectory(prefix="diff_") as tmp_dir:
                 tmp_output = Path(tmp_dir) / out.name
                 _write_styled_report(tmp_output, pd.DataFrame(changes), is_word=False)

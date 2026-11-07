@@ -26,8 +26,10 @@ wheels/
 *.app
 *.appx
 
-# 崩溃日志
+# 运行与崩溃日志
 crash_log.txt
+logs/
+*.log
 
 # IDE
 .vscode/

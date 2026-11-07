@@ -3,11 +3,13 @@ from __future__ import annotations
 
 import copy
 import re
+import tempfile
 from pathlib import Path
 
 import fitz  # PyMuPDF
 
 import bridge
+from safe_output import publish_output
 
 
 IMAGE_SUFFIXES = {".jpg", ".jpeg", ".png", ".bmp", ".tif", ".tiff", ".webp"}
@@ -80,6 +82,14 @@ def _unique_output_path(path: Path) -> Path:
             return candidate
 
     raise RuntimeError(f"无法生成不重名的输出文件: {path}")
+
+
+def _save_pdf_safely(pdf_doc: fitz.Document, output_path: Path) -> Path:
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".pdf_replace_", dir=str(output_path.parent)) as tmp_dir:
+        tmp_out = Path(tmp_dir) / output_path.name
+        pdf_doc.save(str(tmp_out), garbage=4, deflate=True)
+        return publish_output(tmp_out, output_path)
 
 
 # ---------------------------------------------------------
@@ -283,7 +293,7 @@ def _collect_target_pdfs(target_path: Path, recursive: bool) -> list[Path]:
 
     if target_path.is_dir():
         pattern = "**/*.pdf" if recursive else "*.pdf"
-        return sorted((p for p in target_path.glob(pattern) if p.is_file()), key=_natural_key)
+        return sorted((p for p in target_path.glob(pattern) if p.is_file() and not p.name.startswith("~$")), key=_natural_key)
 
     raise ValueError("请选择有效的 PDF 文件或文件夹")
 
@@ -297,7 +307,7 @@ def _collect_images(folder: Path) -> list[Path]:
 
 def _collect_source_pdfs(folder: Path) -> list[Path]:
     return sorted(
-        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".pdf"),
+        (p for p in folder.iterdir() if p.is_file() and p.suffix.lower() == ".pdf" and not p.name.startswith("~$")),
         key=_natural_key,
     )
 
@@ -474,7 +484,7 @@ def _replace_pages_in_one_pdf(
     target_pages_text: str,
     source_path: Path,
     source_pages_text: str,
-) -> None:
+) -> Path:
     target_doc = fitz.open(str(pdf_path))
     replacement_doc = None
 
@@ -509,8 +519,7 @@ def _replace_pages_in_one_pdf(
         _restore_toc(target_doc, toc_snapshot, target_pages, len(replacement_doc))
         _normalize_page_labels(target_doc)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        target_doc.save(str(output_path), garbage=4, deflate=True)
+        return _save_pdf_safely(target_doc, output_path)
 
     finally:
         if replacement_doc is not None:
@@ -523,7 +532,7 @@ def _replace_pages_by_filename_pdf_mapping(
     output_path: Path,
     source_path: Path,
     mapping: list[tuple[int, int]],
-) -> None:
+) -> Path:
     target_doc = fitz.open(str(pdf_path))
     source_doc = fitz.open(str(source_path))
 
@@ -548,8 +557,7 @@ def _replace_pages_by_filename_pdf_mapping(
         _restore_toc(target_doc, toc_snapshot)
         _normalize_page_labels(target_doc)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        target_doc.save(str(output_path), garbage=4, deflate=True)
+        return _save_pdf_safely(target_doc, output_path)
 
     finally:
         source_doc.close()
@@ -560,7 +568,7 @@ def _replace_pages_by_filename_image_mapping(
     pdf_path: Path,
     output_path: Path,
     mapping: list[tuple[int, Path]],
-) -> None:
+) -> Path:
     target_doc = fitz.open(str(pdf_path))
 
     try:
@@ -590,8 +598,7 @@ def _replace_pages_by_filename_image_mapping(
         _restore_toc(target_doc, toc_snapshot)
         _normalize_page_labels(target_doc)
 
-        output_path.parent.mkdir(parents=True, exist_ok=True)
-        target_doc.save(str(output_path), garbage=4, deflate=True)
+        return _save_pdf_safely(target_doc, output_path)
 
     finally:
         target_doc.close()
@@ -617,9 +624,9 @@ def _replace_one_target_with_source_pdf_folder(
         output_path = _unique_output_path(output_dir / source_pdf.name)
         bridge.update_terminal(f"[*] 正在生成 ({idx}/{len(source_pdfs)}): {source_pdf.name}")
         try:
-            _replace_pages_in_one_pdf(target_pdf, output_path, target_pages, source_pdf, source_pages)
+            saved_path = _replace_pages_in_one_pdf(target_pdf, output_path, target_pages, source_pdf, source_pages)
             success_count += 1
-            bridge.update_terminal(f"  └─ ✅ 保存成功: {output_path}")
+            bridge.update_terminal(f"  └─ ✅ 保存成功: {saved_path}")
         except Exception as exc:
             failed.append(f"{source_pdf.name}: {exc}")
             bridge.update_terminal(f"  └─ [x] 失败: {source_pdf.name} - {exc}")
@@ -718,13 +725,13 @@ def run_pdf_replace(
             bridge.update_terminal(f"[*] 正在换页 ({idx}/{len(pdf_files)}): {pdf_path.name}")
             try:
                 if filename_pdf_mapping is not None:
-                    _replace_pages_by_filename_pdf_mapping(pdf_path, output_path, source_path, filename_pdf_mapping)
+                    saved_path = _replace_pages_by_filename_pdf_mapping(pdf_path, output_path, source_path, filename_pdf_mapping)
                 elif filename_image_mapping is not None:
-                    _replace_pages_by_filename_image_mapping(pdf_path, output_path, filename_image_mapping)
+                    saved_path = _replace_pages_by_filename_image_mapping(pdf_path, output_path, filename_image_mapping)
                 else:
-                    _replace_pages_in_one_pdf(pdf_path, output_path, target_pages, source_path, source_pages)
+                    saved_path = _replace_pages_in_one_pdf(pdf_path, output_path, target_pages, source_path, source_pages)
                 success_count += 1
-                bridge.update_terminal(f"  └─ ✅ 保存成功: {output_path}")
+                bridge.update_terminal(f"  └─ ✅ 保存成功: {saved_path}")
             except Exception as exc:
                 failed.append(f"{pdf_path.name}: {exc}")
                 bridge.update_terminal(f"  └─ [x] 失败: {pdf_path.name} - {exc}")

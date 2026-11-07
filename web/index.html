@@ -219,8 +219,9 @@
                 <div class="glass-card">
                     <div class="input-group">
                         <label>PDF 路径:</label>
-                        <input type="text" id="p2w-path" readonly>
-                        <button class="btn-secondary" onclick="selectFile('p2w-path')">选择</button>
+                        <input type="text" id="p2w-path" readonly placeholder="支持单个 PDF 或包含 PDF 的文件夹">
+                        <button class="btn-secondary" onclick="selectFile('p2w-path')">选文件</button>
+                        <button class="btn-secondary" onclick="selectFolder('p2w-path')" style="margin-left:5px">选文件夹</button>
                     </div>
                     <div class="input-group">
                         <label>模式:</label>
@@ -243,12 +244,22 @@
                         <button class="btn-secondary" onclick="selectFile('split-path')">选择</button>
                     </div>
                     <div class="input-group">
-                        <label>数值:</label>
-                        <input type="number" id="split-val" value="10" style="width:80px">
-                        <select id="split-mode">
-                            <option value="split_fixed">📏 定长</option>
-                            <option value="split_avg">⚖️ 平均</option>
+                        <label>模式:</label>
+                        <select id="split-mode" onchange="toggleSplitInputs()">
+                            <option value="split_fixed">📏 定长拆分</option>
+                            <option value="split_avg">⚖️ 平均拆分</option>
+                            <option value="extract">📑 范围提取</option>
                         </select>
+                        <span id="split-val-wrap" style="display:inline-flex;align-items:center;gap:8px;margin-left:10px">
+                            <label style="width:auto">数值:</label>
+                            <input type="number" id="split-val" value="10" min="1" style="width:80px">
+                        </span>
+                        <span id="split-range-wrap" style="display:none;align-items:center;gap:8px;margin-left:10px">
+                            <label style="width:auto">起始页:</label>
+                            <input type="number" id="split-start" value="1" min="1" style="width:70px">
+                            <label style="width:auto">结束页:</label>
+                            <input type="number" id="split-end" value="1" min="1" style="width:70px">
+                        </span>
                     </div>
                     <button class="btn-primary" onclick="execTask('split', this)">🚀 执行拆分</button>
                 </div>
@@ -290,8 +301,9 @@
                 <div class="glass-card">
                     <div class="input-group">
                         <label>PDF 源:</label>
-                        <input type="text" id="unlock-path" readonly>
-                        <button class="btn-secondary" onclick="selectFile('unlock-path')">选择</button>
+                        <input type="text" id="unlock-path" readonly placeholder="支持单个 PDF 或包含 PDF 的文件夹">
+                        <button class="btn-secondary" onclick="selectFile('unlock-path')">选文件</button>
+                        <button class="btn-secondary" onclick="selectFolder('unlock-path')" style="margin-left:5px">选文件夹</button>
                     </div>
                     <div class="input-group">
                         <label>打开密码:</label>
@@ -320,8 +332,8 @@
             <div id="view-comp" class="tool-view">
                 <div class="glass-card">
                     <div class="input-group">
-                        <label>PDF 文件:</label>
-                        <input type="text" id="comp-path" readonly>
+                        <label>目标文件:</label>
+                        <input type="text" id="comp-path" readonly placeholder="支持 PDF、Word (.docx/.doc)">
                         <button class="btn-secondary" onclick="selectFile('comp-path')">选择</button>
                     </div>
                     <div class="input-group">
@@ -432,6 +444,6 @@
         </main>
     </div>
 
-    <script src="script.js?v=5"></script>
+    <script src="script.js?v=6"></script>
 </body>
 </html>
