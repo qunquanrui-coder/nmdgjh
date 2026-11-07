@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 
 import bridge
+from safe_output import new_output_file
 import os
 import shutil
 import tempfile
@@ -16,6 +17,15 @@ try:
     import pikepdf
 except Exception:
     pikepdf = None
+
+
+def _copy_to_unique_output(source: Path, desired: Path) -> Path:
+    # Compression may select the original file itself; copying ensures that
+    # later edits to the result cannot alter the input via a shared hard link.
+    with new_output_file(desired) as (output, actual_path):
+        with source.open("rb") as inp:
+            shutil.copyfileobj(inp, output)
+    return actual_path
 
 
 PDF_FLOOR_RATIO = 0.80   # PDF 不希望压得离目标太远
@@ -227,7 +237,8 @@ def run_compress(path_str, target_size, unit):
                 word = None
                 pythoncom.CoInitialize()
                 try:
-                    word = win32com.client.Dispatch("Word.Application")
+                    word = win32com.client.DispatchEx("Word.Application")
+                    word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
                     word.Visible = False
                     doc = word.Documents.Open(str(in_p))
                     temp_docx = Path(tmp) / f"{original_input.stem}_temp.docx"
@@ -282,7 +293,7 @@ def run_compress(path_str, target_size, unit):
 
                 if work_size <= target_b:
                     final = original_input.parent / f"{original_input.stem}_compressed.pdf"
-                    shutil.copy(work_input, final)
+                    final = _copy_to_unique_output(work_input, final)
                     return {"status": "success", "msg": f"压缩完成：{final.name}"}
 
                 # 第二步：Ghostscript 有损压缩
@@ -381,7 +392,7 @@ def run_compress(path_str, target_size, unit):
 
                 if best and best["path"].exists():
                     final = original_input.parent / f"{original_input.stem}_compressed.pdf"
-                    shutil.copy(best["path"], final)
+                    final = _copy_to_unique_output(best["path"], final)
 
                     safe_update_terminal(f"[*] {choose_msg}")
                     safe_update_terminal(
@@ -510,7 +521,7 @@ def run_compress(path_str, target_size, unit):
                 final = original_input.parent / f"{original_input.stem}_compressed.docx"
 
                 if best and best["path"].exists():
-                    shutil.copy(best["path"], final)
+                    final = _copy_to_unique_output(best["path"], final)
 
                     safe_update_terminal(f"[*] {choose_msg}")
                     safe_update_terminal(

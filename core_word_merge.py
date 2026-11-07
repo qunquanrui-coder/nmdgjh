@@ -49,7 +49,7 @@ def run_word_merge(folder, out_name):
         word = win32.DispatchEx("Word.Application")
         word.Visible = word.ScreenUpdating = False
         word.DisplayAlerts = 0
-        word.AutomationSecurity = 1
+        word.AutomationSecurity = 3  # 禁止自动打开的文档运行宏
 
         state["stage"] = "创建合并文档"
         merged_doc = word.Documents.Add()

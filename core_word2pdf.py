@@ -12,6 +12,7 @@ from typing import Any, Dict, List, Optional
 import pythoncom
 import win32com.client
 import pywintypes
+from safe_output import publish_output
 
 
 class ComManager:
@@ -50,21 +51,6 @@ def _stop_heartbeat(stop_event, thread) -> None:
         thread.join(timeout=1)
     except Exception:
         pass
-
-
-def _atomic_replace(tmp_path: Path, final_path: Path) -> bool:
-    """原子替换文件，处理 Windows 文件占用冲突"""
-    for _ in range(5):
-        try:
-            if final_path.exists():
-                final_path.unlink()
-            tmp_path.replace(final_path)
-            return True
-        except PermissionError:
-            time.sleep(0.5)
-        except OSError:
-            time.sleep(0.5)
-    return False
 
 
 def _collect_input_files(root: Path, recursive: bool, exts: set[str]) -> List[Path]:
@@ -201,6 +187,7 @@ def run_word2pdf(
             word = win32com.client.DispatchEx("Word.Application")
             word.Visible = 0
             word.DisplayAlerts = 0
+            word.AutomationSecurity = 3
             try:
                 word.Options.UsePrinterMetrics = True
                 word.Options.Pagination = True
@@ -211,6 +198,7 @@ def run_word2pdf(
             excel = win32com.client.DispatchEx("Excel.Application")
             excel.Visible = 0
             excel.DisplayAlerts = 0
+            excel.AutomationSecurity = 3
 
         success_count = 0
         failed_items: List[str] = []
@@ -261,13 +249,14 @@ def run_word2pdf(
                     _safe_close_wb(wb)
                     wb = None
 
-                heartbeat_state["stage"] = "替换输出文件"
-                if _atomic_replace(tmp_out, out):
-                    bridge.update_terminal(f"[√] 完成: {out.name}")
+                heartbeat_state["stage"] = "保存输出文件"
+                try:
+                    actual_out = publish_output(tmp_out, out)
+                    bridge.update_terminal(f"[√] 完成: {actual_out.name}")
                     success_count += 1
-                else:
+                except OSError as exc:
                     keep_tmp = True
-                    bridge.update_terminal(f"[!] 文件占用，已保留临时结果: {tmp_out.name}")
+                    bridge.update_terminal(f"[!] 保存失败，已保留临时结果: {tmp_out.name} ({exc})")
                     success_count += 1
 
             except pywintypes.com_error as e:

@@ -27,13 +27,14 @@ class WordSplitterEngine:
         self._stop_event = threading.Event()
 
     def _apply_speed_hacks(self, word: Any) -> None:
+        # Fail closed if macros cannot be disabled before opening a document.
+        word.AutomationSecurity = 3
         try:
             word.ScreenUpdating = False
             word.Options.Pagination = False
             word.Options.CheckSpellingAsYouType = False
             word.Options.CheckGrammarAsYouType = False
             word.DisplayAlerts = 0
-            word.AutomationSecurity = 1
         except pythoncom.com_error:
             pass
 

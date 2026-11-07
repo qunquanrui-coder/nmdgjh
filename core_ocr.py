@@ -14,6 +14,7 @@ import warnings
 from contextlib import contextmanager
 from pathlib import Path
 from typing import Any, Dict, List
+from safe_output import publish_output
 
 
 try:
@@ -305,20 +306,6 @@ def _heartbeat_worker(file_name: str, stream: OCRProgressStream, stop_event: thr
             stream.last_update_time = time.time()
 
 
-def _atomic_replace(tmp_path: Path, final_path: Path) -> bool:
-    for _ in range(5):
-        try:
-            if final_path.exists():
-                final_path.unlink()
-            tmp_path.replace(final_path)
-            return True
-        except PermissionError:
-            time.sleep(0.5)
-        except OSError:
-            time.sleep(0.5)
-    return False
-
-
 def _collect_pdf_files(target: Path) -> List[Path]:
     if target.is_file():
         if target.suffix.lower() == ".pdf":
@@ -403,13 +390,14 @@ def _run_single_ocr(path: Path, safe_threads: int) -> Dict[str, Any]:
             push_heartbeat_log(f"[!] [{path.name}] OCR 完成但未生成输出文件")
             return {"status": "error", "msg": f"{path.name} 未生成输出文件", "data": None}
 
-        if _atomic_replace(tmp_output_path, output_path):
-            push_heartbeat_log(f"[√] [{path.name}] OCR 完成 -> {output_path.name}")
-            return {"status": "success", "msg": "", "data": str(output_path)}
-
-        keep_tmp = True
-        push_heartbeat_log(f"[!] [{path.name}] 输出文件被占用，结果已保留为: {tmp_output_path.name}")
-        return {"status": "success", "msg": "", "data": str(tmp_output_path)}
+        try:
+            actual_output = publish_output(tmp_output_path, output_path)
+            push_heartbeat_log(f"[√] [{path.name}] OCR 完成 -> {actual_output.name}")
+            return {"status": "success", "msg": "", "data": str(actual_output)}
+        except OSError as exc:
+            keep_tmp = True
+            push_heartbeat_log(f"[!] [{path.name}] 保存失败，结果已保留为: {tmp_output_path.name} ({exc})")
+            return {"status": "success", "msg": "", "data": str(tmp_output_path)}
 
     except Exception as e:
         sys.stderr = original_stderr

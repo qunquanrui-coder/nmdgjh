@@ -3,11 +3,13 @@ import bridge
 import difflib
 import threading
 import time
+import tempfile
 import pandas as pd
 from pathlib import Path
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, PatternFill
 from openpyxl.utils import get_column_letter
+from safe_output import publish_output
 
 try:
     import docx
@@ -46,13 +48,29 @@ def _stop_heartbeat(stop_event, thread):
 def _read_docx_lines(path: Path, progress=None):
     d = docx.Document(str(path))
     lines = []
-    total = len(d.paragraphs)
-    for i, p in enumerate(d.paragraphs, 1):
-        if progress and (i % 200 == 0 or i == total):
-            progress("read Word paragraphs", i, total)
-        t = (p.text or "").strip()
-        if t:
-            lines.append((i, t))
+    from docx.oxml.table import CT_Tbl
+    from docx.oxml.text.paragraph import CT_P
+    from docx.table import Table
+    from docx.text.paragraph import Paragraph
+
+    def read_blocks(container, element, location=""):
+        table_no = 0
+        for child in element.iterchildren():
+            if isinstance(child, CT_P):
+                value = (Paragraph(child, container).text or "").strip()
+                if value:
+                    lines.append((len(lines) + 1, f"{location}{value}"))
+            elif isinstance(child, CT_Tbl):
+                table_no += 1
+                table = Table(child, container)
+                for row_no, row in enumerate(table.rows, 1):
+                    for col_no, cell in enumerate(row.cells, 1):
+                        label = f"{location}表格{table_no}第{row_no}行第{col_no}列："
+                        read_blocks(cell, cell._tc, label)
+            if progress and len(lines) and len(lines) % 200 == 0:
+                progress("read Word paragraphs and tables", len(lines), None)
+
+    read_blocks(d, d.element.body)
     return lines
 
 
@@ -92,6 +110,11 @@ def _write_styled_report(out: Path, df: pd.DataFrame, is_word: bool):
 
     wb = load_workbook(out)
     ws = wb["差异报告"]
+    # Source document text is data, even when it starts with '='.
+    for row in ws.iter_rows():
+        for cell in row:
+            if cell.data_type == "f":
+                cell.data_type = "s"
     ws.freeze_panes = "A2"
 
     header_fill = PatternFill("solid", fgColor="1F4E79")
@@ -135,7 +158,10 @@ def run_diff(a_path, b_path, strict):
             changes = _diff_text(a_lines, b_lines, progress)
             out = b.parent / f"{b.stem}_Word对比报告.xlsx"
             progress("write report")
-            _write_styled_report(out, pd.DataFrame(changes), is_word=True)
+            with tempfile.TemporaryDirectory(prefix="diff_") as tmp_dir:
+                tmp_output = Path(tmp_dir) / out.name
+                _write_styled_report(tmp_output, pd.DataFrame(changes), is_word=True)
+                out = publish_output(tmp_output, out)
             return {"status": "success", "msg": f"报告已生成: {out.name}"}
 
         elif ext in (".xlsx", ".xls"):
@@ -144,11 +170,15 @@ def run_diff(a_path, b_path, strict):
             wa = load_workbook(a, data_only=True)
             progress(f"open {b.name}")
             wb = load_workbook(b, data_only=True)
+            fa = load_workbook(a, data_only=False)
+            fb = load_workbook(b, data_only=False)
             changes = []
             sheets = sorted(set(wa.sheetnames) | set(wb.sheetnames))
             for sheet_idx, s in enumerate(sheets, 1):
                 sa = wa[s] if s in wa.sheetnames else None
                 sb = wb[s] if s in wb.sheetnames else None
+                fsa = fa[s] if s in fa.sheetnames else None
+                fsb = fb[s] if s in fb.sheetnames else None
                 max_r = max(sa.max_row if sa else 1, sb.max_row if sb else 1)
                 max_c = max(sa.max_column if sa else 1, sb.max_column if sb else 1)
                 progress(f"scan sheet {s}", sheet_idx, len(sheets))
@@ -160,10 +190,19 @@ def run_diff(a_path, b_path, strict):
                         vb = sb.cell(r, c).value if sb else None
                         if va != vb:
                             changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r}", "Old": str(va) if va is not None else "", "New": str(vb) if vb is not None else ""})
+                        ca = fsa.cell(r, c) if fsa else None
+                        cb = fsb.cell(r, c) if fsb else None
+                        old_formula = ca.value if ca and ca.data_type == "f" else None
+                        new_formula = cb.value if cb and cb.data_type == "f" else None
+                        if old_formula != new_formula:
+                            changes.append({"Sheet": s, "Cell": f"{get_column_letter(c)}{r} (公式)", "Old": old_formula or "", "New": new_formula or ""})
 
             out = b.parent / f"{b.stem}_Excel对比报告.xlsx"
             progress("write report")
-            _write_styled_report(out, pd.DataFrame(changes), is_word=False)
+            with tempfile.TemporaryDirectory(prefix="diff_") as tmp_dir:
+                tmp_output = Path(tmp_dir) / out.name
+                _write_styled_report(tmp_output, pd.DataFrame(changes), is_word=False)
+                out = publish_output(tmp_output, out)
             return {"status": "success", "msg": f"报告已生成: {out.name}"}
         else:
             return {"status": "error", "msg": "仅支持 docx 或 xlsx 比对"}

@@ -1,7 +1,8 @@
 # -*- coding: utf-8 -*-
-import bridge, io, re, time, threading, img2pdf
+import bridge, io, re, time, threading, img2pdf, os, tempfile
 from pathlib import Path
 from PIL import Image
+from safe_output import publish_output
 
 
 def _start_heartbeat(label, state, interval=5):
@@ -80,8 +81,13 @@ def run_img2pdf(path, recursive, include_root):
 
                 state.update({"stage": "写入 PDF", "current": None, "total": None})
                 out_file = folder / f"{folder.name}.pdf"
-                with open(out_file, "wb") as f:
-                    img2pdf.convert(inputs, outputstream=f)
+                fd, tmp_name = tempfile.mkstemp(prefix=".img2pdf_", suffix=".pdf", dir=str(folder))
+                try:
+                    with os.fdopen(fd, "wb") as f:
+                        img2pdf.convert(inputs, outputstream=f)
+                    out_file = publish_output(Path(tmp_name), out_file)
+                finally:
+                    Path(tmp_name).unlink(missing_ok=True)
                 bridge.update_terminal(f"  └─ ✅ 已生成: {out_file.name}")
                 converted_count += 1
             finally:

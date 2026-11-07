@@ -20,6 +20,7 @@ import shutil
 import site
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -51,7 +52,7 @@ APP_DISPLAY_NAME = "泉泉的百宝箱"
 APP_DESCRIPTION = "泉泉的百宝箱 - 本地桌面文档工具箱"
 APP_COMPANY = "qunquanrui-coder"
 APP_COPYRIGHT = "Copyright (c) 2026 qunquanrui-coder. All rights reserved."
-APP_VERSION = os.environ.get("APP_VERSION", "2.1.3")
+APP_VERSION = os.environ.get("APP_VERSION", "2.1.4")
 
 DIST_DIR = ROOT / "dist"
 BUILD_DIR = ROOT / "build"
@@ -187,7 +188,7 @@ def find_pywin32_system32() -> Optional[Path]:
     return None
 
 
-def build_pyinstaller_command() -> list[str]:
+def build_pyinstaller_command(dist_dir: Optional[Path] = None) -> list[str]:
     cmd: list[str] = [
         sys.executable,
         "-m",
@@ -199,7 +200,7 @@ def build_pyinstaller_command() -> list[str]:
         "--name",
         APP_NAME,
         "--distpath",
-        str(DIST_DIR),
+        str(dist_dir or DIST_DIR),
         "--workpath",
         str(BUILD_DIR),
         "--specpath",
@@ -338,34 +339,56 @@ def verify_output(app_dir: Path) -> None:
     log(f"[SUCCESS] 打包完成，可测试 dist/{APP_NAME}/{APP_NAME}.exe")
 
 
+def install_build(app_dir: Path) -> None:
+    """Install a verified build while retaining any previous build."""
+    destination = DIST_DIR / APP_NAME
+    previous = None
+    if destination.exists():
+        previous = DIST_DIR / f"{APP_NAME}_previous"
+        index = 2
+        while previous.exists():
+            previous = DIST_DIR / f"{APP_NAME}_previous_{index}"
+            index += 1
+        destination.rename(previous)
+    try:
+        app_dir.rename(destination)
+    except Exception:
+        if previous is not None:
+            previous.rename(destination)
+        raise
+    if previous is not None:
+        log(f"[PRESERVED] Previous build: {previous}")
+
+
 def build() -> None:
     ensure_exists(ENTRY, "入口文件 main.py")
     ensure_exists(WEB_DIR, "web 目录")
 
-    remove_dir(BUILD_DIR)
-    remove_dir(DIST_DIR)
-    remove_dir(SPEC_DIR)
+    remove_dir(BUILD_DIR / APP_NAME)
 
     create_version_file()
-    cmd = build_pyinstaller_command()
+    DIST_DIR.mkdir(parents=True, exist_ok=True)
+    with tempfile.TemporaryDirectory(prefix=".package-", dir=DIST_DIR) as staging:
+        cmd = build_pyinstaller_command(Path(staging))
 
-    log("\n[START] Running PyInstaller...\n")
-    try:
-        subprocess.run(cmd, cwd=ROOT, check=True)
-    except subprocess.CalledProcessError as e:
-        raise RuntimeError(f"PyInstaller 执行失败，退出码: {e.returncode}") from e
+        log("\n[START] Running PyInstaller...\n")
+        try:
+            subprocess.run(cmd, cwd=ROOT, check=True)
+        except subprocess.CalledProcessError as e:
+            raise RuntimeError(f"PyInstaller 执行失败，退出码: {e.returncode}") from e
 
-    app_dir = DIST_DIR / APP_NAME
-    ensure_exists(app_dir, "dist 输出目录")
+        app_dir = Path(staging) / APP_NAME
+        ensure_exists(app_dir, "dist 输出目录")
 
-    log("\n[SYNC] Copy runtime folders...\n")
-    copy_runtime_dirs(app_dir)
+        log("\n[SYNC] Copy runtime folders...\n")
+        copy_runtime_dirs(app_dir)
 
-    log("\n[SYNC] Copy web assets...\n")
-    copy_web_dir(app_dir)
+        log("\n[SYNC] Copy web assets...\n")
+        copy_web_dir(app_dir)
 
-    log("\n[CHECK] Verify package...\n")
-    verify_output(app_dir)
+        log("\n[CHECK] Verify package...\n")
+        verify_output(app_dir)
+        install_build(app_dir)
 
 
 if __name__ == "__main__":

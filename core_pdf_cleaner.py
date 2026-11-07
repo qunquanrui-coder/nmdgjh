@@ -5,6 +5,8 @@ import cv2
 import numpy as np
 from pathlib import Path
 import time
+import tempfile
+from safe_output import publish_output
 
 @bridge.expose
 def run_pdf_cleaner(path_str: str):
@@ -97,9 +99,16 @@ def run_pdf_cleaner(path_str: str):
                             if r.width > 0 and r.height > 0:
                                 page.draw_rect(r, color=None, fill=(1, 1, 1))
                     else:
-                        page.draw_rect(page.rect, color=None, fill=(1, 1, 1))
+                        # A surrounding border can hide all interior contours.
+                        # Never obscure a page when content bounds are uncertain.
+                        bridge.update_terminal(f"  └─ ⚠️ 第 {page_num + 1} 页无法确定内容边界，保留原页面")
 
-                doc.save(str(out_path))
+                # Save first, then publish under a unique name so earlier results
+                # survive both successful reruns and failed writes.
+                with tempfile.TemporaryDirectory(dir=str(output_dir)) as tmpdir:
+                    temporary_pdf = Path(tmpdir) / "result.pdf"
+                    doc.save(str(temporary_pdf))
+                    out_path = publish_output(temporary_pdf, out_path)
             finally:
                 if doc is not None:
                     doc.close()

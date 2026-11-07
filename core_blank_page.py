@@ -21,6 +21,7 @@ from pathlib import Path
 from typing import List, Tuple, Optional, Dict, Any
 
 import bridge
+from safe_output import new_output_file
 import pywintypes
 import win32com.client.dynamic
 import win32com
@@ -62,7 +63,9 @@ def make_backup_before_overwrite(path: Path) -> Tuple[bool, Optional[Path], Opti
     if backup_path.exists():
         backup_path = path.with_name(f"{path.stem}.blankbak_{int(time.time())}{path.suffix}")
     try:
-        shutil.copy2(path, backup_path)
+        with new_output_file(backup_path) as (output, backup_path):
+            with path.open("rb") as source:
+                shutil.copyfileobj(source, output)
         return True, backup_path, None
     except Exception as e:
         return False, None, str(e)
@@ -225,7 +228,7 @@ def process_pdf_core(pdf_path: Path) -> Tuple[str, List[int]]:
 
         doc.select(keep_indices)
 
-        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf")
+        temp_fd, temp_path = tempfile.mkstemp(suffix=".pdf", dir=str(pdf_path.parent))
         os.close(temp_fd)
 
         try:
@@ -434,7 +437,8 @@ def process_word_core(word_path: Path) -> Tuple[str, List[int]]:
 
     try:
         safe_update_terminal(f"[*] [{word_path.name}] 启动 Word 引擎...")
-        word = win32com.client.dynamic.Dispatch("Word.Application")
+        word = win32com.client.DispatchEx("Word.Application")
+        word.AutomationSecurity = 3  # msoAutomationSecurityForceDisable
         word.Visible = False
         word.DisplayAlerts = 0
 
@@ -611,6 +615,7 @@ def collect_target_files(target_path: Path) -> List[Path]:
                 p
                 for p in target_path.rglob("*")
                 if p.is_file() and p.suffix.lower() in exts and not p.name.startswith("~$")
+                and not re.search(r"\.blankbak(?:_\d+)?(?: \(\d+\))?$", p.stem, re.IGNORECASE)
             ],
             key=lambda x: str(x).lower(),
         )

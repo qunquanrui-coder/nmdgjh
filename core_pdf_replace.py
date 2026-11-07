@@ -197,6 +197,49 @@ def _restore_toc(pdf_doc: fitz.Document, toc: list, target_pages: list[int] | No
 
 
 
+def _snapshot_links_to_replaced_pages(pdf_doc: fitz.Document, target_pages: list[int]) -> list:
+    """Keep internal links on surviving pages whose targets will be deleted."""
+    target_set = set(target_pages)
+    links = []
+    for page_index in range(len(pdf_doc)):
+        if page_index in target_set:
+            continue
+        for link in pdf_doc[page_index].get_links():
+            if link.get("kind") == fitz.LINK_GOTO and link.get("page") in target_set:
+                links.append((page_index, copy.deepcopy(link)))
+    return links
+
+
+def _restore_links_to_replaced_pages(
+    pdf_doc: fitz.Document, links: list, target_pages: list[int], inserted_count: int
+) -> None:
+    if not links:
+        return
+    start, end = min(target_pages), max(target_pages)
+    count_changed = inserted_count != len(target_pages)
+    delta = inserted_count - len(target_pages)
+    for old_source, old_link in links:
+        source = old_source + delta if count_changed and old_source > end else old_source
+        destination = old_link["page"]
+        if count_changed:
+            destination = start + min(destination - start, inserted_count - 1)
+        link = dict(old_link)
+        link["page"] = destination
+        link.pop("xref", None)
+        link.pop("id", None)
+        page = pdf_doc[source]
+        already_present = any(
+            existing.get("kind") == fitz.LINK_GOTO
+            and existing.get("page") == destination
+            and existing.get("from") == link.get("from")
+            for existing in page.get_links()
+        )
+        if not already_present:
+            # If this fails, propagate the error instead of silently publishing
+            # an output with broken cross-references.
+            page.insert_link(link)
+
+
 def _normalize_page_labels(pdf_doc: fitz.Document) -> None:
     """把 PDF 阅读器页码标签重置为物理页码，避免显示 623 (624 / 624) 这类偏移。"""
     if len(pdf_doc) <= 0:
@@ -442,6 +485,7 @@ def _replace_pages_in_one_pdf(
         toc_snapshot = _snapshot_toc(target_doc)
         target_pages = _parse_page_ranges(target_pages_text, len(target_doc), "目标 PDF")
         target_rects = [fitz.Rect(target_doc[p].rect) for p in target_pages]
+        links_snapshot = _snapshot_links_to_replaced_pages(target_doc, target_pages)
         replacement_doc = _build_replacement_doc(source_path, source_pages_text, target_rects)
 
         if len(replacement_doc) == len(target_pages):
@@ -461,6 +505,7 @@ def _replace_pages_in_one_pdf(
                 target_doc.delete_page(target_index)
             target_doc.insert_pdf(replacement_doc, start_at=insert_at)
 
+        _restore_links_to_replaced_pages(target_doc, links_snapshot, target_pages, len(replacement_doc))
         _restore_toc(target_doc, toc_snapshot, target_pages, len(replacement_doc))
         _normalize_page_labels(target_doc)
 
@@ -492,11 +537,14 @@ def _replace_pages_by_filename_pdf_mapping(
             preview = "、".join(str(p) for p in invalid[:10])
             raise ValueError(f"来源 PDF 文件名识别到的目标页码超出目标 PDF 范围：{preview}")
 
+        target_pages = sorted({target_index for target_index, _ in mapping})
+        links_snapshot = _snapshot_links_to_replaced_pages(target_doc, target_pages)
         for target_index, source_index in sorted(mapping, key=lambda item: item[0], reverse=True):
             bridge.update_terminal(f"  ├─ 来源 PDF 第 {source_index + 1} 页 -> 替换目标第 {target_index + 1} 页")
             target_doc.delete_page(target_index)
             target_doc.insert_pdf(source_doc, from_page=source_index, to_page=source_index, start_at=target_index)
 
+        _restore_links_to_replaced_pages(target_doc, links_snapshot, target_pages, len(target_pages))
         _restore_toc(target_doc, toc_snapshot)
         _normalize_page_labels(target_doc)
 
@@ -525,6 +573,8 @@ def _replace_pages_by_filename_image_mapping(
             preview = "、".join(str(p) for p in invalid[:10])
             raise ValueError(f"图片文件名识别到的目标页码超出目标 PDF 范围：{preview}")
 
+        target_pages = sorted({target_index for target_index, _ in mapping})
+        links_snapshot = _snapshot_links_to_replaced_pages(target_doc, target_pages)
         for target_index, image_path in sorted(mapping, key=lambda item: item[0], reverse=True):
             bridge.update_terminal(f"  ├─ {image_path.name} -> 替换目标第 {target_index + 1} 页")
             rect = fitz.Rect(target_doc[target_index].rect)
@@ -536,6 +586,7 @@ def _replace_pages_by_filename_image_mapping(
             finally:
                 replacement_doc.close()
 
+        _restore_links_to_replaced_pages(target_doc, links_snapshot, target_pages, len(target_pages))
         _restore_toc(target_doc, toc_snapshot)
         _normalize_page_labels(target_doc)
 

@@ -7,6 +7,7 @@ import pdfplumber
 import fitz
 from openpyxl import load_workbook
 from openpyxl.styles import Font, Alignment, Border, Side
+from safe_output import new_output_file, publish_output
 
 os.environ["DISABLE_MODEL_SOURCE_CHECK"] = "True"
 try:
@@ -46,7 +47,7 @@ def _stop_heartbeat(stop_event, thread):
 
 def clean_text(text: str) -> str:
     if not text: return ""
-    return text.replace(" ", "").replace("　", "").replace("：", ":").replace("，", ",").replace("¥", "").replace("￥", "").replace("_", "").replace("~", "")
+    return text.replace(" ", "").replace("　", "").replace("：", ":").replace("，", ",").replace("−", "-").replace("－", "-").replace("¥", "").replace("￥", "").replace("_", "").replace("~", "")
 
 def get_standard_rate(ocr_rate_str: str):
     if not ocr_rate_str: return None
@@ -159,14 +160,15 @@ def get_info_strict_code(full_text: str):
     if date_match: invoice_date = date_match.group(1)
 
     all_nums = []
-    for n in re.findall(r"([0-9]+\.\d{2})", clean_str):
+    for n in re.findall(r"(-?[0-9][0-9,]*\.\d{2})", clean_str):
         try:
-            f = float(n)
-            if 0.01 <= f < 10000000000: all_nums.append(f)
+            f = float(n.replace(",", ""))
+            if 0.01 <= abs(f) < 10000000000: all_nums.append(f)
         except: continue
-    floats = sorted(all_nums, reverse=True)
+    floats = sorted((abs(n) for n in all_nums), reverse=True)
 
-    ocr_rate, ocr_rate_str = 0.01, "1%"
+    # A missing tax rate is unknown, not evidence of the 1% rate.
+    ocr_rate, ocr_rate_str = None, ""
     rate_match = re.search(r"(税率|征收率)[^%免0-9]{0,15}(\d{1,2}%|免税)", clean_str)
     if rate_match:
         cleaned = get_standard_rate(rate_match.group(2))
@@ -182,23 +184,39 @@ def get_info_strict_code(full_text: str):
                 ocr_rate_str = f"{int(ocr_rate * 100)}%" if ocr_rate > 0 else "免税"
 
     total_val = 0.0
-    total_match = re.search(r"(?:价税合计|小写)[^0-9]{0,15}([0-9,]+\.\d{2})", clean_str)
+    total_match = re.search(r"(?:价税合计|小写)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if total_match:
         try: total_val = float(total_match.group(1).replace(",", ""))
         except: pass
-    if total_val == 0.0 and floats: total_val = floats[0]
+    if total_match is None and all_nums: total_val = max(all_nums, key=abs)
+
+    # Perform the existing positive-amount inference on absolute values and
+    # restore the original sign afterwards (red invoices have negative totals).
+    amount_sign = -1 if total_val < 0 else 1
+    total_val = abs(total_val)
 
     pre_tax_val = tax_val = None
-    tax_match = re.search(r"(?:合计税额|税额)[^0-9]{0,15}([0-9,]+\.\d{2})", clean_str)
+    tax_match = re.search(r"(?:合计税额|税额)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if tax_match:
         try: tax_val = float(tax_match.group(1).replace(",", ""))
         except: pass
-    amt_match = re.search(r"(?:不含税金额|合计金额|金额)[^0-9]{0,15}([0-9,]+\.\d{2})", clean_str)
+    amt_match = re.search(r"(?:不含税金额|合计金额|金额)[^0-9-]{0,15}(-?[0-9,]+\.\d{2})", clean_str)
     if amt_match:
         try: pre_tax_val = float(amt_match.group(1).replace(",", ""))
         except: pass
 
-    final_pre_tax, final_tax = 0.0, 0.0
+    # Keep explicitly extracted signs; inconsistent signs must not be silently
+    # converted into a plausible but fabricated positive invoice.
+    inconsistent_signs = any(v is not None and v != 0 and (v < 0) != (amount_sign < 0)
+                             for v in (pre_tax_val, tax_val))
+    if inconsistent_signs:
+        def fmt_explicit(val):
+            return "{:.2f}".format(val) if val is not None else ""
+        return (invoice_code, invoice_num, invoice_date, ocr_rate_str,
+                fmt_explicit(pre_tax_val), fmt_explicit(tax_val), fmt_explicit(amount_sign * total_val))
+    pre_tax_val = abs(pre_tax_val) if pre_tax_val is not None else None
+    tax_val = abs(tax_val) if tax_val is not None else None
+    final_pre_tax, final_tax = pre_tax_val, tax_val
     final_rate_str = ocr_rate_str
 
     if total_val > 0:
@@ -218,7 +236,7 @@ def get_info_strict_code(full_text: str):
                 calc_rate = calculate_rate_from_amounts(final_pre_tax, final_tax)
                 if calc_rate is not None:
                     final_rate_str = f"{int(calc_rate * 100)}%" if calc_rate > 0 else "免税"
-            else:
+            elif ocr_rate is not None:
                 target_pre_tax = total_val / (1 + ocr_rate) if (1 + ocr_rate) != 0 else 0.0
                 found_sum = find_subset_sum(floats, target_pre_tax)
                 if found_sum:
@@ -228,8 +246,8 @@ def get_info_strict_code(full_text: str):
                     final_pre_tax = target_pre_tax
                     final_tax = total_val - final_pre_tax
 
-    def fmt(val): return "{:.2f}".format(val) if val and val > 0 else ""
-    return (invoice_code, invoice_num, invoice_date, final_rate_str, fmt(final_pre_tax), fmt(final_tax), fmt(total_val))
+    def fmt(val): return "{:.2f}".format(amount_sign * val) if val is not None else ""
+    return (invoice_code, invoice_num, invoice_date, final_rate_str, fmt(final_pre_tax), fmt(final_tax), fmt(total_val) if total_match or total_val else "")
 
 def extract_text_from_pdf(file_path: str, progress_callback=None) -> str:
     text_parts = []
@@ -354,12 +372,16 @@ def run_invoice(path, recursive):
         out_file = folder / "发票汇总表.xlsx"
         df_out = pd.DataFrame(data_list)[["发票代码", "发票号码", "开票日期", "税率", "金额(不含税)", "税额", "价税合计"]]
         bridge.update_terminal("[*] \u6b63\u5728\u5199\u5165\u53d1\u7968\u6c47\u603b Excel...")
-        save_excel_formatted(df_out, str(out_file))
+        with tempfile.TemporaryDirectory(prefix="invoice_") as tmp_dir:
+            tmp_output = Path(tmp_dir) / out_file.name
+            save_excel_formatted(df_out, str(tmp_output))
+            out_file = publish_output(tmp_output, out_file)
         
-        msg = f"成功提取 {len(data_list)} 张"
+        msg = f"成功提取 {len(data_list)} 张，已保存为 {out_file.name}"
         if error_list:
-            (folder / "errors.txt").write_text("\n".join(error_list), encoding="utf-8")
-            msg += f"，跳过/异常 {len(error_list)} 个 (详见 errors.txt)"
+            with new_output_file(folder / "errors.txt") as (stream, error_file):
+                stream.write("\n".join(error_list).encode("utf-8"))
+            msg += f"，跳过/异常 {len(error_list)} 个 (详见 {error_file.name})"
             
         return {"status": "success", "msg": msg}
     except Exception as e:
