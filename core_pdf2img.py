@@ -2,29 +2,34 @@
 import bridge, fitz
 from pathlib import Path
 from PIL import Image
+from safe_output import new_output_directory
 
 @bridge.expose
 def run_pdf2img(path, longedge, quality):
+    if not path or not str(path).strip():
+        return {"status": "error", "msg": "请选择要转为图片的 PDF 文件。"}
     try:
         pdf_p = Path(path).resolve()
-        out_dir = pdf_p.parent / f"{pdf_p.stem}_images"
-        out_dir.mkdir(parents=True, exist_ok=True)
-        doc = fitz.open(pdf_p)
-        for pi, page in enumerate(doc):
-            # ✨ 严格还原 Acrobat 对齐逻辑
-            clip = getattr(page, "cropbox", None) or page.rect
-            w_pt, h_pt = clip.width, clip.height
-            le = int(longedge)
-            if h_pt >= w_pt: tw, th = int(round(le * w_pt / h_pt)), le
-            else: tw, th = le, int(round(le * h_pt / w_pt))
-            
-            pix = page.get_pixmap(matrix=fitz.Matrix(tw/w_pt, th/h_pt), clip=clip, alpha=False)
-            img = Image.frombytes("RGB", (pix.width, pix.height), pix.samples)
-            
-            # ✨ 还原精确 DPI 写入逻辑
-            dpi_x = int(round(pix.width / (w_pt / 72.0)))
-            dpi_y = int(round(pix.height / (h_pt / 72.0)))
-            img.save(str(out_dir / f"{pi+1:04d}.jpg"), "JPEG", quality=int(quality), dpi=(dpi_x, dpi_y))
-            if (pi+1) % 10 == 0: bridge.update_terminal(f"[*] 渲染第 {pi+1} 页...")
-        return {"status": "success"}
+        long_edge = int(longedge)
+        image_quality = int(quality)
+        if long_edge < 1:
+            return {"status": "error", "msg": "图片长边必须大于 0。"}
+
+        with fitz.open(pdf_p) as doc:
+            if len(doc) == 0:
+                return {"status": "error", "msg": "PDF 没有可转换的页面。"}
+            out_dir = new_output_directory(pdf_p.parent / f"{pdf_p.stem}_images")
+            for index, page in enumerate(doc, 1):
+                # PyMuPDF already applies the crop box and rotation when rendering.
+                # page.rect measures the visible page in the same coordinates.
+                width_pt, height_pt = page.rect.width, page.rect.height
+                scale = long_edge / max(width_pt, height_pt)
+                pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+                dpi_x = round(pix.width * 72 / width_pt)
+                dpi_y = round(pix.height * 72 / height_pt)
+                with Image.frombytes("RGB", (pix.width, pix.height), pix.samples) as image:
+                    image.save(out_dir / f"{index:04d}.jpg", "JPEG", quality=image_quality, dpi=(dpi_x, dpi_y))
+                if index % 10 == 0:
+                    bridge.update_terminal(f"[*] 渲染第 {index} 页...")
+        return {"status": "success", "msg": f"保存至: {out_dir.name}"}
     except Exception as e: return {"status": "error", "msg": str(e)}

@@ -626,6 +626,8 @@ def collect_target_files(target_path: Path) -> List[Path]:
 @bridge.expose
 def run_rm_blank(target_path: str) -> Dict[str, Any]:
     try:
+        if not (target_path or "").strip():
+            return {"status": "error", "msg": "请选择要清理的 Word/PDF 文件或文件夹", "data": None}
         root = Path(target_path.strip()).resolve()
         files = collect_target_files(root)
 

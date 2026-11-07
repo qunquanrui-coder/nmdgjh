@@ -69,6 +69,8 @@ def _run_image_mode(f, out, dpi, res_container):
 @bridge.expose
 def run_pdf2word(path_str, mode, dpi):
     try:
+        if not (path_str or "").strip():
+            return {"status": "error", "msg": "请选择要转换的 PDF 文件或文件夹"}
         p = Path(path_str.strip()).resolve()
         files = []
         

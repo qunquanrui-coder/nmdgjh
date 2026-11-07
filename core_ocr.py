@@ -423,6 +423,8 @@ def _run_single_ocr(path: Path, safe_threads: int) -> Dict[str, Any]:
 @bridge.expose
 def run_ocr(target_path: str) -> Dict[str, Any]:
     try:
+        if not (target_path or "").strip():
+            return {"status": "error", "msg": "请选择要识别的 PDF 文件或文件夹", "data": None}
         target = Path(target_path.strip())
         file_paths = _collect_pdf_files(target)
 

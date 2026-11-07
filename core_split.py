@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 import bridge, os, re, mmap, tempfile, fitz
 from pathlib import Path
+from safe_output import new_output_directory
 try: import pypdf
 except: pypdf = None
 try: import pikepdf
@@ -38,13 +39,15 @@ def _open_pdf_robust(path):
 
 @bridge.expose
 def run_split(path, mode, fixed, parts, start, end):
+    if not path or not str(path).strip():
+        return {"status": "error", "msg": "请选择要拆分的 PDF 文件。"}
     doc, err = _open_pdf_robust(path)
-    if not doc: return {"status": "error", "msg": err}
+    if doc is None: return {"status": "error", "msg": err}
     try:
         base_n = re.sub(r'[\\/:*?"<>|]', '_', Path(path).stem)
-        out_dir = Path(path).parent / f"{base_n}_{mode}"
-        out_dir.mkdir(parents=True, exist_ok=True)
         total = len(doc)
+        if total == 0:
+            return {"status": "error", "msg": "PDF 没有可拆分的页面。"}
         
         # 还原：平均/定长/提取 算法逻辑
         ranges = []
@@ -63,11 +66,12 @@ def run_split(path, mode, fixed, parts, start, end):
         else:
             return {"status": "error", "msg": f"未知拆分模式: {mode}"}
         
+        out_dir = new_output_directory(Path(path).parent / f"{base_n}_{mode}")
         for idx, (s, e) in enumerate(ranges, 1):
-            new_doc = fitz.open()
-            new_doc.insert_pdf(doc, from_page=s-1, to_page=e-1)
             fname = f"{base_n}_Part{idx}_P{s}-{e}.pdf"
-            new_doc.save(str(out_dir / fname)); new_doc.close()
+            with fitz.open() as new_doc:
+                new_doc.insert_pdf(doc, from_page=s-1, to_page=e-1)
+                new_doc.save(str(out_dir / fname))
             bridge.update_terminal(f"[*] 导出: {fname}")
         return {"status": "success", "msg": f"保存至: {out_dir.name}"}
     finally:

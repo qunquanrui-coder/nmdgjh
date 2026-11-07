@@ -7,6 +7,19 @@ import os
 import shutil
 
 
+def new_output_directory(path: Path) -> Path:
+    """Create a separate directory for each export without touching previous ones."""
+    path = Path(path)
+    index = 0
+    while True:
+        candidate = path if index == 0 else path.with_name(f"{path.name} ({index})")
+        try:
+            candidate.mkdir()
+            return candidate
+        except FileExistsError:
+            index += 1
+
+
 @contextmanager
 def new_output_file(path: Path):
     """Exclusively create a unique filename and remove incomplete output on error."""

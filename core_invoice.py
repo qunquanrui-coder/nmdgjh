@@ -327,6 +327,8 @@ def save_excel_formatted(df: pd.DataFrame, output_file: str):
 @bridge.expose
 def run_invoice(path, recursive):
     try:
+        if not str(path or "").strip():
+            return {"status": "error", "msg": "请选择存放发票的文件夹"}
         folder = Path(path).resolve()
         files = list(folder.rglob("*.*") if recursive else folder.iterdir())
         valid = [f for f in files if f.suffix.lower() in (".pdf",".jpg",".png",".jpeg",".bmp") and not f.name.startswith("~$")]

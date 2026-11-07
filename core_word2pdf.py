@@ -154,6 +154,8 @@ def run_word2pdf(
     包含针对 Word 导出末尾空白页的专项修复。
     """
 
+    if not (input_path or "").strip():
+        return {"status": "error", "msg": "请选择要转换的 Office 文件或文件夹", "data": None}
     ComManager.init()
 
     word: Optional[Any] = None

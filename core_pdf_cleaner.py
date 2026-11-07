@@ -12,6 +12,8 @@ from safe_output import publish_output
 def run_pdf_cleaner(path_str: str):
     """PDF 扫描件智能去黑边核心逻辑 (接入 bridge 终端版)"""
     try:
+        if not (path_str or "").strip():
+            return {"status": "error", "msg": "请选择要去黑边的 PDF 文件或文件夹"}
         target_path = Path(path_str.strip()).resolve()
         pdf_files = []
 

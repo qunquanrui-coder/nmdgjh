@@ -19,6 +19,25 @@ const TASK_LABELS = {
   inv: "发票自动提取",
   diff: "文档差异比对",
 };
+
+const REQUIRED_PATH_FIELDS = {
+  p2w: ["p2w-path"],
+  rmblank: ["rmblank-path"],
+  pdfclean: ["pdfclean-path"],
+  pdfreplace: ["pdfreplace-target", "pdfreplace-source"],
+  split: ["split-path"],
+  wsplit: ["wsplit-path", "wsplit-out"],
+  wmerge: ["wmerge-dir"],
+  unlock: ["unlock-path"],
+  comp: ["comp-path"],
+  ocr: ["ocr-path"],
+  i2p: ["i2p-path"],
+  w2p: ["w2p-path"],
+  p2i: ["p2i-path"],
+  inv: ["inv-path"],
+  diff: ["diff-f1", "diff-f2"],
+};
+
 // pywebview API 就绪等待
 let pyApiReadyResolve = null;
 const pyApiReady = new Promise((resolve) => {
@@ -93,7 +112,7 @@ function showToast(message, type = "info") {
 /**
  * 2. 终端日志输出
  */
-function update_terminal(msg) {
+function update_terminal(msg, notificationType) {
   const term = document.getElementById("terminal");
   if (!term) return;
 
@@ -102,7 +121,9 @@ function update_terminal(msg) {
   term.appendChild(div);
   term.scrollTop = term.scrollHeight;
 
-  if (msg.includes("[√]") || msg.includes("成功")) {
+  if (notificationType) {
+    showToast(msg, notificationType);
+  } else if (msg.includes("[√]") || msg.includes("成功")) {
     showToast(msg.replace("[√]", "").trim(), "success");
   } else if (
     msg.includes("[x]") ||
@@ -268,6 +289,12 @@ async function selectWordFileForSplit(id) {
  * 6. 核心任务分发器
  */
 async function execTask(type, btnElement) {
+  const requiredPaths = REQUIRED_PATH_FIELDS[type] || [];
+  if (requiredPaths.some((id) => !document.getElementById(id)?.value.trim())) {
+    showToast("请先选择此工具所需的文件或文件夹", "warning");
+    return;
+  }
+
   let originalText = "执行任务";
 
   if (btnElement) {
@@ -393,10 +420,11 @@ async function execTask(type, btnElement) {
     if (res && res.status === "success") {
       update_terminal(`[√] 任务处理成功完成: ${res.msg || ""}`);
       showToast(res.msg || "任务执行成功", "success");
+    } else if (res && res.status === "partial") {
+      update_terminal(`[部分完成] ${res.msg || "部分文件已处理"}`, "warning");
     } else {
-      const msg = res ? res.msg : "未知错误";
-      update_terminal(`[!] 引擎返回失败: ${msg}`);
-      showToast(msg || "任务执行失败", "error");
+      const msg = res?.msg || "未知错误";
+      update_terminal(`[!] 引擎返回失败: ${msg}`, "error");
     }
   } catch (e) {
     const errorMsg = e && e.toString ? e.toString() : String(e);

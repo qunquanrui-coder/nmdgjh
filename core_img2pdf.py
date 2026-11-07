@@ -51,6 +51,8 @@ def _png_to_white_jpeg_bytes(p):
 @bridge.expose
 def run_img2pdf(path, recursive, include_root):
     try:
+        if not str(path or "").strip():
+            return {"status": "error", "msg": "请选择有效的图片文件夹"}
         root_folder = Path(path).resolve()
         if not root_folder.is_dir():
             return {"status": "error", "msg": "请选择有效的图片文件夹"}

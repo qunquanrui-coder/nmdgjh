@@ -320,6 +320,8 @@ def get_word_outline(doc_path: str) -> Dict[str, Any]:
 
 @bridge.expose
 def run_word_split(doc_path: str, out_dir: str, target_level_str: str, recommended_lvl: int) -> Dict[str, Any]:
+    if not str(doc_path or "").strip() or not str(out_dir or "").strip():
+        return {"status": "error", "msg": "请重新选择要拆分的 Word 文件"}
     if "推荐" in target_level_str or not any(char.isdigit() for char in target_level_str):
         target = int(recommended_lvl)
     else:
