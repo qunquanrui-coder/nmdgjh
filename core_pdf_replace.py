@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 from __future__ import annotations
 
+import copy
 import re
 from pathlib import Path
 
@@ -80,6 +81,156 @@ def _unique_output_path(path: Path) -> Path:
 
     raise RuntimeError(f"无法生成不重名的输出文件: {path}")
 
+
+# ---------------------------------------------------------
+# PDF 目录 / 书签保护
+# ---------------------------------------------------------
+def _snapshot_toc(pdf_doc: fitz.Document) -> list:
+    """保存原 PDF 的目录/书签，避免 delete_page + insert_pdf 后书签目标丢失。"""
+    try:
+        return copy.deepcopy(pdf_doc.get_toc(simple=False) or [])
+    except Exception as exc:
+        try:
+            bridge.update_terminal(f"[!] 读取原 PDF 目录失败，将继续换页但不修复目录: {exc}")
+        except Exception:
+            pass
+        return []
+
+
+def _clean_toc_for_set(toc: list) -> list:
+    """去掉旧目录项里的 xref，避免把已删除页面的旧对象号重新写回。"""
+    cleaned: list = []
+    for item in toc:
+        row = list(item)
+        if len(row) >= 4 and isinstance(row[3], dict):
+            dest = dict(row[3])
+            dest.pop("xref", None)
+            row[3] = dest
+        cleaned.append(row)
+    return cleaned
+
+
+def _remap_toc_page(page_no: int, start_page: int, end_page: int, inserted_count: int) -> int:
+    """根据换页数量调整目录页码。page_no / start_page / end_page 都是 1 基页码。"""
+    if not isinstance(page_no, int) or page_no < 1:
+        return page_no
+
+    removed_count = end_page - start_page + 1
+    delta = inserted_count - removed_count
+
+    if page_no < start_page:
+        return page_no
+
+    if page_no <= end_page:
+        if inserted_count <= 0:
+            return start_page
+        offset = page_no - start_page
+        return start_page + min(offset, inserted_count - 1)
+
+    return page_no + delta
+
+
+def _adjust_contiguous_toc_pages(toc: list, target_pages: list[int], inserted_count: int, page_count: int) -> list:
+    """连续范围换页且页数变化时，修正目录页码。等页数替换时保持原页码。"""
+    if not toc or not target_pages:
+        return toc
+
+    start_page = min(target_pages) + 1
+    end_page = max(target_pages) + 1
+    adjusted: list = []
+
+    for item in toc:
+        row = list(item)
+        if len(row) >= 3:
+            old_page = row[2]
+            new_page = _remap_toc_page(old_page, start_page, end_page, inserted_count)
+            if isinstance(new_page, int) and new_page > page_count:
+                new_page = page_count
+            row[2] = new_page
+
+            if len(row) >= 4 and isinstance(row[3], dict):
+                dest = dict(row[3])
+                # get_toc(simple=False) 的 dest['page'] 在不同 PyMuPDF 版本中可能是 0 基页码。
+                # 这里同步修正，避免详细目录目标仍指向旧页。
+                if isinstance(dest.get("page"), int) and isinstance(new_page, int) and new_page >= 1:
+                    dest["page"] = new_page - 1
+                dest.pop("xref", None)
+                row[3] = dest
+        adjusted.append(row)
+
+    return adjusted
+
+
+def _restore_toc(pdf_doc: fitz.Document, toc: list, target_pages: list[int] | None = None, inserted_count: int | None = None) -> None:
+    """把换页前的目录/书签重新写回 PDF，防止书签变灰、跳转页错乱。"""
+    if not toc:
+        return
+
+    target_pages = target_pages or []
+    if target_pages and inserted_count is not None and _is_contiguous(target_pages):
+        toc_to_set = _adjust_contiguous_toc_pages(toc, target_pages, inserted_count, len(pdf_doc))
+    else:
+        toc_to_set = toc
+
+    toc_to_set = _clean_toc_for_set(toc_to_set)
+
+    try:
+        pdf_doc.set_toc(toc_to_set)
+        try:
+            bridge.update_terminal("  ├─ 已保留并修复原 PDF 目录/书签跳转")
+        except Exception:
+            pass
+    except Exception as exc:
+        # 详细目录写入失败时，退回简单目录，至少保证左侧目录能点到正确页。
+        try:
+            simple_toc = [[row[0], row[1], row[2]] for row in toc_to_set if len(row) >= 3]
+            pdf_doc.set_toc(simple_toc)
+            try:
+                bridge.update_terminal(f"  ├─ 已用兼容模式修复目录/书签跳转: {exc}")
+            except Exception:
+                pass
+        except Exception as exc2:
+            try:
+                bridge.update_terminal(f"[!] 目录/书签修复失败，已保留换页结果: {exc2}")
+            except Exception:
+                pass
+
+
+
+def _normalize_page_labels(pdf_doc: fitz.Document) -> None:
+    """把 PDF 阅读器页码标签重置为物理页码，避免显示 623 (624 / 624) 这类偏移。"""
+    if len(pdf_doc) <= 0:
+        return
+
+    try:
+        if hasattr(pdf_doc, "set_page_labels"):
+            pdf_doc.set_page_labels([
+                {
+                    "startpage": 0,
+                    "prefix": "",
+                    "style": "D",
+                    "firstpagenum": 1,
+                }
+            ])
+            try:
+                bridge.update_terminal("  ├─ 已重置 PDF 页码标签为实际物理页码")
+            except Exception:
+                pass
+            return
+
+        # 兼容极旧 PyMuPDF：移除 Catalog 里的 /PageLabels，阅读器会退回物理页码。
+        catalog_xref = pdf_doc.pdf_catalog()
+        if catalog_xref:
+            pdf_doc.xref_set_key(catalog_xref, "PageLabels", "null")
+            try:
+                bridge.update_terminal("  ├─ 已移除旧 PDF 页码标签，阅读器将使用实际物理页码")
+            except Exception:
+                pass
+    except Exception as exc:
+        try:
+            bridge.update_terminal(f"[!] PDF 页码标签重置失败，已保留换页结果: {exc}")
+        except Exception:
+            pass
 
 def _collect_target_pdfs(target_path: Path, recursive: bool) -> list[Path]:
     if target_path.is_file():
@@ -288,6 +439,7 @@ def _replace_pages_in_one_pdf(
         if len(target_doc) == 0:
             raise ValueError("目标 PDF 没有页面")
 
+        toc_snapshot = _snapshot_toc(target_doc)
         target_pages = _parse_page_ranges(target_pages_text, len(target_doc), "目标 PDF")
         target_rects = [fitz.Rect(target_doc[p].rect) for p in target_pages]
         replacement_doc = _build_replacement_doc(source_path, source_pages_text, target_rects)
@@ -309,6 +461,9 @@ def _replace_pages_in_one_pdf(
                 target_doc.delete_page(target_index)
             target_doc.insert_pdf(replacement_doc, start_at=insert_at)
 
+        _restore_toc(target_doc, toc_snapshot, target_pages, len(replacement_doc))
+        _normalize_page_labels(target_doc)
+
         output_path.parent.mkdir(parents=True, exist_ok=True)
         target_doc.save(str(output_path), garbage=4, deflate=True)
 
@@ -328,6 +483,7 @@ def _replace_pages_by_filename_pdf_mapping(
     source_doc = fitz.open(str(source_path))
 
     try:
+        toc_snapshot = _snapshot_toc(target_doc)
         if not mapping:
             raise ValueError("没有可执行的来源 PDF 文件名页码映射")
 
@@ -340,6 +496,9 @@ def _replace_pages_by_filename_pdf_mapping(
             bridge.update_terminal(f"  ├─ 来源 PDF 第 {source_index + 1} 页 -> 替换目标第 {target_index + 1} 页")
             target_doc.delete_page(target_index)
             target_doc.insert_pdf(source_doc, from_page=source_index, to_page=source_index, start_at=target_index)
+
+        _restore_toc(target_doc, toc_snapshot)
+        _normalize_page_labels(target_doc)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         target_doc.save(str(output_path), garbage=4, deflate=True)
@@ -357,6 +516,7 @@ def _replace_pages_by_filename_image_mapping(
     target_doc = fitz.open(str(pdf_path))
 
     try:
+        toc_snapshot = _snapshot_toc(target_doc)
         if not mapping:
             raise ValueError("没有可执行的图片文件名页码映射")
 
@@ -375,6 +535,9 @@ def _replace_pages_by_filename_image_mapping(
                 target_doc.insert_pdf(replacement_doc, start_at=target_index)
             finally:
                 replacement_doc.close()
+
+        _restore_toc(target_doc, toc_snapshot)
+        _normalize_page_labels(target_doc)
 
         output_path.parent.mkdir(parents=True, exist_ok=True)
         target_doc.save(str(output_path), garbage=4, deflate=True)
