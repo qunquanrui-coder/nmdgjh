@@ -164,7 +164,7 @@ function switchView(viewId, element) {
     wsplit: ["Word 目录拆解", "按大纲级别一键拆分为独立文档"],
     wmerge: ["Word 批量合并", "按自然顺序合并多个 Word 文档"],
     unlock: ["PDF 权限解密", "移除打印、复制及编辑限制"],
-    comp: ["文档极限瘦身", "按目标大小自动选择压缩结果"],
+    comp: ["文档极限瘦身", "手动设定目标大小，按图片清晰度智能分级压缩（高清多压、低清保护）"],
     ocr: ["PDF OCR 增强", "强制 OCR 重新扫描，生成透明文本层"],
     i2p: ["图像转 PDF", "按自然顺序合并图片生成 PDF"],
     w2p: ["Word 转 PDF", "Office 原生内核导出"],
@@ -402,7 +402,8 @@ async function execTask(type, btnElement) {
         "run_compress",
         document.getElementById("comp-path").value,
         document.getElementById("comp-size").value,
-        document.getElementById("comp-unit").value
+        document.getElementById("comp-unit").value,
+        document.getElementById("comp-smart")?.checked ?? true
       );
     } else if (type === "ocr") {
       res = await invoke("run_ocr", document.getElementById("ocr-path").value);

@@ -14,7 +14,7 @@
 - Word 目录拆解：按大纲标题级别拆分成多个 Word 文档，每次拆解独立建目录保护历史结果
 - Word 批量合并：自然排序合并，自动插入标题和分页
 - PDF 权限解密：移除打印、复制、编辑等限制，支持单文件与文件夹批量清洗
-- 文档压缩：PDF 使用 pikepdf / Ghostscript，Word 压缩内嵌图片
+- 文档压缩：支持手动设定目标大小与按图片清晰度智能分级压缩（高清多压、低清保护），PDF 结合 pikepdf / PyMuPDF / Ghostscript，Word 支持内嵌图片智能压缩
 - PDF OCR 增强：基于 OCRmyPDF 生成可搜索 PDF
 - 图像转 PDF：支持 JPG、PNG、BMP，自然排序合并
 - Word / Excel 转 PDF：调用 Office 原生导出能力
